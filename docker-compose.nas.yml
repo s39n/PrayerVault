@@ -15,6 +15,8 @@
 services:
   prayervault:
     image: ghcr.io/s39n/prayervault:latest
+    # Must be able to write PRAYERS_DIR; match the folder owner's uid:gid
+    user: "${PUID:-1000}:${PGID:-1000}"
     restart: unless-stopped
     environment:
       - VAULT_DIR=/vault
