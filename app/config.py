@@ -1,3 +1,4 @@
+import base64
 import os
 
 VAULT_DIR = os.environ.get("VAULT_DIR", "/vault")
@@ -6,6 +7,11 @@ OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.1:8b")
 SESSION_SECRET = os.environ.get("SESSION_SECRET", "")
 AUTH_USERNAME = os.environ.get("AUTH_USERNAME", "sean")
 AUTH_PASSWORD_HASH = os.environ.get("AUTH_PASSWORD_HASH", "")
+if not AUTH_PASSWORD_HASH:
+    # $-free alternative for compose/Dockhand env panels that mangle bcrypt hashes
+    _b64 = os.environ.get("AUTH_PASSWORD_HASH_B64", "").strip()
+    if _b64:
+        AUTH_PASSWORD_HASH = base64.b64decode(_b64).decode()
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "true").lower() == "true"
 SESSION_MAX_AGE = int(os.environ.get("SESSION_MAX_AGE", str(60 * 60 * 24 * 14)))
 OLLAMA_TIMEOUT = int(os.environ.get("OLLAMA_TIMEOUT", "300"))
