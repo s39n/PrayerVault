@@ -1,0 +1,6 @@
+{$DOMAIN} {
+	reverse_proxy prayervault:8000
+	header {
+		Strict-Transport-Security "max-age=31536000"
+	}
+}

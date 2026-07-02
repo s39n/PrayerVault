@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PrayerVault</title>
+<style>
+:root{--bg:#f6f3ec;--card:#fffdf8;--ink:#33302a;--muted:#7a7466;--accent:#5b6e58;--accent-dark:#46543f;--gold:#b28a3e;--line:#e4ddcf;--danger:#9c4a3c}
+*{box-sizing:border-box}
+body{margin:0;font-family:Georgia,'Times New Roman',serif;background:var(--bg);color:var(--ink);line-height:1.55}
+header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--line);background:var(--card)}
+header h1{font-size:1.25rem;margin:0;font-weight:normal;letter-spacing:.5px}
+header h1 em{color:var(--accent);font-style:normal}
+main{max-width:860px;margin:0 auto;padding:20px}
+button{font-family:inherit;font-size:.95rem;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 14px;border-radius:8px;cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.primary:hover{background:var(--accent-dark)}
+button.link{border:none;background:none;color:var(--accent);text-decoration:underline;padding:4px}
+input,textarea,select{font-family:inherit;font-size:1rem;width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+textarea{min-height:140px;resize:vertical}
+label{display:block;margin:12px 0 4px;color:var(--muted);font-size:.9rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:14px}
+.card.clickable:hover{border-color:var(--accent);cursor:pointer}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.chip{border:1px solid var(--line);border-radius:20px;padding:4px 12px;font-size:.85rem;background:var(--card);cursor:pointer;color:var(--muted)}
+.chip.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.badge{font-size:.75rem;padding:2px 9px;border-radius:10px;background:var(--line);color:var(--muted)}
+.badge.answered{background:#dfe8d9;color:var(--accent-dark)}
+.badge.pending{background:#f3e8cf;color:var(--gold)}
+.badge.error{background:#f0d9d3;color:var(--danger)}
+.meta{color:var(--muted);font-size:.85rem}
+.section-title{color:var(--accent-dark);font-size:.85rem;text-transform:uppercase;letter-spacing:1.5px;margin:20px 0 6px;border-bottom:1px solid var(--line);padding-bottom:4px}
+.scripture-ref{color:var(--gold);font-weight:bold}
+#login-view{max-width:360px;margin:12vh auto}
+.error-msg{color:var(--danger);font-size:.9rem;min-height:1.2em;margin-top:8px}
+.hidden{display:none}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+blockquote{border-left:3px solid var(--gold);margin:8px 0;padding:2px 14px;color:var(--muted)}
+ul{padding-left:22px}
+.verse-quote{white-space:pre-wrap}
+</style>
+</head>
+<body>
+<header>
+  <h1>Prayer<em>Vault</em></h1>
+  <div id="header-actions" class="hidden">
+    <button id="btn-new" class="primary">+ New Prayer</button>
+    <button id="btn-logout" class="link">Sign out</button>
+  </div>
+</header>
+<main>
+  <div id="login-view" class="card hidden">
+    <h2 style="margin-top:0;font-weight:normal">Sign in</h2>
+    <p class="meta" style="margin-top:-8px">“Cast your burden on the Lord, and he will sustain you.” — Ps 55:22</p>
+    <label>Username</label><input id="login-user" autocomplete="username">
+    <label>Password</label><input id="login-pass" type="password" autocomplete="current-password">
+    <div class="error-msg" id="login-error"></div>
+    <button id="btn-login" class="primary" style="width:100%;margin-top:6px">Sign in</button>
+  </div>
+  <div id="list-view" class="hidden"></div>
+  <div id="detail-view" class="hidden"></div>
+  <div id="new-view" class="hidden"></div>
+</main>
+<script src="/app.js"></script>
+</body>
+</html>
