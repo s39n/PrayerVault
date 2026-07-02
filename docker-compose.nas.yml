@@ -1,13 +1,16 @@
-# NAS deployment via Dockhand git stack (or docker compose with -e vars set).
-# All values come from the Dockhand "Environment variables" panel via ${VAR}
-# interpolation — no .env file needed.
+# NAS deployment via Dockhand git stack.
+# Access: LAN → http://<nas-ip>:${LAN_PORT} ; outside → https://pray.safile.us
+# through a Cloudflare Tunnel (no port forwarding, no exposed IP).
 #
-# Password: use AUTH_PASSWORD_HASH_B64 (printed by scripts/hash_password.py).
-# It is base64 and contains no $ signs, so no interpolation layer can mangle it.
+# Cloudflare setup (one time):
+#   1. Cloudflare Zero Trust dashboard → Networks → Tunnels → Create tunnel
+#   2. Copy the tunnel token into TUNNEL_TOKEN in the Dockhand env panel
+#   3. In the tunnel's "Public hostnames" add:
+#        pray.safile.us  →  HTTP  →  prayervault:8000
+#      (Cloudflare creates the DNS record automatically)
 #
-# Prereq: the NAS Docker daemon must be able to pull the private image —
-# add ghcr.io credentials in Dockhand's registry settings, or run:
-#   docker login ghcr.io -u s39n -p <PAT with read:packages>
+# Password: use AUTH_PASSWORD_HASH_B64 (printed by scripts/hash_password.py) —
+# base64, no $ signs, survives every interpolation layer.
 
 services:
   prayervault:
@@ -20,21 +23,17 @@ services:
       - SESSION_SECRET=${SESSION_SECRET:?generate with python -c "import secrets; print(secrets.token_hex(32))"}
       - OLLAMA_URL=${OLLAMA_URL:?e.g. http://10.0.0.210:11434 - no /v1 suffix}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.1:8b}
-      - COOKIE_SECURE=${COOKIE_SECURE:-true}
+      # false so login works over plain HTTP on the LAN; external traffic is
+      # HTTPS via Cloudflare regardless.
+      - COOKIE_SECURE=${COOKIE_SECURE:-false}
+    ports:
+      - "${LAN_PORT:-8800}:8000"
     volumes:
       - "${PRAYERS_DIR:?host folder where prayer notes are stored}:/vault"
 
-  caddy:
-    image: caddy:2
+  cloudflared:
+    image: cloudflare/cloudflared:latest
     restart: unless-stopped
-    command: caddy reverse-proxy --from ${DOMAIN:?public domain, e.g. pray.safile.us} --to prayervault:8000
-    ports:
-      - "${HTTP_PORT:-80}:80"
-      - "${HTTPS_PORT:-443}:443"
-    volumes:
-      - caddy_data:/data
-      - caddy_config:/config
-
-volumes:
-  caddy_data:
-  caddy_config:
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN:?create a tunnel in Cloudflare Zero Trust and paste its token}
