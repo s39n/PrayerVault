@@ -1,38 +1,34 @@
-# NAS deployment — pulls the prebuilt image from GHCR instead of building locally.
-# Usage: docker compose -f docker-compose.nas.yml up -d
+# NAS deployment via Dockhand git stack (or docker compose with -e vars set).
+# All values come from the Dockhand "Environment variables" panel via ${VAR}
+# interpolation — no .env file needed. Required vars error out with a hint.
 #
-# One-time GHCR login on the NAS (image is private):
-#   docker login ghcr.io -u s39n -p <PAT with read:packages scope>
-#
-# In .env on the NAS, set:
-#   PRAYERS_DIR=/volume1/path/to/SecondBrain/Atlas/Faith & Ministry/Prayers/Prayer Journal
-#   OLLAMA_URL=http://<ip-of-machine-running-ollama>:11434
-# (host.docker.internal does NOT reach your PC from a NAS — use a real LAN IP,
-#  and make sure Ollama listens on it: set OLLAMA_HOST=0.0.0.0 on that machine.)
+# Prereq: the NAS Docker daemon must be able to pull the private image —
+# add ghcr.io credentials in Dockhand's registry settings, or run:
+#   docker login ghcr.io -u s39n -p <PAT with read:packages>
 
 services:
   prayervault:
     image: ghcr.io/s39n/prayervault:latest
     restart: unless-stopped
-    env_file: .env
     environment:
       - VAULT_DIR=/vault
+      - AUTH_USERNAME=${AUTH_USERNAME:-sean}
+      - AUTH_PASSWORD_HASH=${AUTH_PASSWORD_HASH:?generate with scripts/hash_password.py}
+      - SESSION_SECRET=${SESSION_SECRET:?generate with python -c "import secrets; print(secrets.token_hex(32))"}
+      - OLLAMA_URL=${OLLAMA_URL:?e.g. http://10.0.0.210:11434 - no /v1 suffix}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.1:8b}
+      - COOKIE_SECURE=${COOKIE_SECURE:-true}
     volumes:
-      - "${PRAYERS_DIR}:/vault"
-    # For LAN-only use without Caddy, uncomment and set COOKIE_SECURE=false in .env:
-    # ports:
-    #   - "8800:8000"
+      - "${PRAYERS_DIR:?host folder where prayer notes are stored}:/vault"
 
   caddy:
     image: caddy:2
     restart: unless-stopped
+    command: caddy reverse-proxy --from ${DOMAIN:?public domain, e.g. pray.safile.us} --to prayervault:8000
     ports:
-      - "80:80"
-      - "443:443"
-    environment:
-      - DOMAIN=${DOMAIN}
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
 
