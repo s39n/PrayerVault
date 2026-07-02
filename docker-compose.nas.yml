@@ -1,0 +1,41 @@
+# NAS deployment — pulls the prebuilt image from GHCR instead of building locally.
+# Usage: docker compose -f docker-compose.nas.yml up -d
+#
+# One-time GHCR login on the NAS (image is private):
+#   docker login ghcr.io -u s39n -p <PAT with read:packages scope>
+#
+# In .env on the NAS, set:
+#   PRAYERS_DIR=/volume1/path/to/SecondBrain/Atlas/Faith & Ministry/Prayers/Prayer Journal
+#   OLLAMA_URL=http://<ip-of-machine-running-ollama>:11434
+# (host.docker.internal does NOT reach your PC from a NAS — use a real LAN IP,
+#  and make sure Ollama listens on it: set OLLAMA_HOST=0.0.0.0 on that machine.)
+
+services:
+  prayervault:
+    image: ghcr.io/s39n/prayervault:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - VAULT_DIR=/vault
+    volumes:
+      - "${PRAYERS_DIR}:/vault"
+    # For LAN-only use without Caddy, uncomment and set COOKIE_SECURE=false in .env:
+    # ports:
+    #   - "8800:8000"
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN=${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

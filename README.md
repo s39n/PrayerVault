@@ -59,3 +59,24 @@ requested-by: The Smiths
 pip install -r requirements.txt pytest
 pytest tests/
 ```
+
+## Deploying on a NAS
+
+Every push to `master` runs the tests and publishes a private multi-arch image
+(amd64 + arm64) to `ghcr.io/s39n/prayervault:latest`, so the NAS never has to build.
+
+1. On GitHub, create a Personal Access Token (classic) with the `read:packages` scope.
+2. On the NAS: `docker login ghcr.io -u s39n -p <token>`
+3. Copy `docker-compose.nas.yml`, `Caddyfile`, and a filled-in `.env` to the NAS.
+4. In `.env`, point `PRAYERS_DIR` at the vault copy on the NAS and set
+   `OLLAMA_URL=http://<lan-ip-of-ollama-machine>:11434` — `host.docker.internal`
+   only works when Ollama runs on the same host. On the Ollama machine set
+   `OLLAMA_HOST=0.0.0.0` so it accepts LAN connections.
+5. `docker compose -f docker-compose.nas.yml up -d`
+
+Update later with:
+`docker compose -f docker-compose.nas.yml pull && docker compose -f docker-compose.nas.yml up -d`
+
+> **Vault sync caution:** the app writes notes to whatever folder `PRAYERS_DIR` points
+> at. On the NAS that must be a folder that syncs back into your vault (Syncthing /
+> git pull job / SMB mount of the synced copy), or the notes will exist only on the NAS.
