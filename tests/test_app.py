@@ -91,3 +91,39 @@ def test_path_traversal_blocked():
 def test_wikilink_format():
     assert ollama_client._wikilink("John", 1, 13, 13) == "[[John 1#13|John 1:13]]"
     assert ollama_client._wikilink("John", 1, 13, 16) == "[[John 1#13|John 1:13-16]]"
+
+
+def test_semantic_search_and_related(monkeypatch):
+    from app import embeddings
+
+    async def fake_embed(text, is_query=False):
+        # crude deterministic vectors: axis 0 = sleep-ish, axis 1 = health-ish
+        t = text.lower()
+        return [1.0 if "sleep" in t else 0.0, 1.0 if ("surgery" in t or "health" in t) else 0.0, 0.1]
+
+    async def fake_generate(kind, title, text, requested_by=""):
+        return ollama_client._shape(FAKE_AI)
+
+    monkeypatch.setattr(embeddings, "_embed", fake_embed)
+    monkeypatch.setattr(ollama_client, "generate", fake_generate)
+    client.post("/api/login", json={"username": "sean", "password": "testpass"})
+
+    a = client.post("/api/prayers", json={"type": "prayer", "title": "Safe Sleep",
+        "text": "Praying the kids sleep peacefully tonight."}).json()["id"]
+    b = client.post("/api/prayers", json={"type": "prayer", "title": "Restful Sleep for Eli",
+        "text": "That Eli would sleep through the night."}).json()["id"]
+
+    r = client.get("/api/search", params={"q": "trouble sleeping"})
+    assert r.status_code == 200
+    ids = [x["id"] for x in r.json()]
+    assert ids[0] in (a, b) and ids[1] in (a, b)
+    assert all("score" in x for x in r.json())
+
+    # second sleep prayer should have picked up a Related link to the first
+    n = client.get(f"/api/prayers/{b}").json()
+    assert "Related" in n["sections"]
+    assert a in n["sections"]["Related"]
+
+    # Related renders between How to Pray and Updates in the file
+    raw = (notes.vault_dir() / f"{b}.md").read_text()
+    assert raw.index("## Related") < raw.index("## Updates")

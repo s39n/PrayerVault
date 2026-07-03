@@ -25,6 +25,7 @@ services:
       - SESSION_SECRET=${SESSION_SECRET:?generate with python -c "import secrets; print(secrets.token_hex(32))"}
       - OLLAMA_URL=${OLLAMA_URL:?e.g. http://10.0.0.210:11434 - no /v1 suffix}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.1:8b}
+      - EMBED_MODEL=${EMBED_MODEL:-nomic-embed-text:latest}
       # false so login works over plain HTTP on the LAN; external traffic is
       # HTTPS via Cloudflare regardless.
       - COOKIE_SECURE=${COOKIE_SECURE:-false}

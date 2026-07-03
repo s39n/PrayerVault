@@ -75,15 +75,55 @@ async function renderList() {
       <div class="meta">${esc(i.date)}${i.requested_by ? " · for " + esc(i.requested_by) : ""}</div>
       <div class="meta" style="margin-top:6px">${esc(i.preview)}${i.preview.length >= 160 ? "…" : ""}</div>
     </div>`).join("");
-  $("list-view").innerHTML = `<div class="row" style="margin-bottom:14px">${chips}</div>` +
+  $("list-view").innerHTML =
+    `<input id="search-box" placeholder="Search prayers by meaning\u2026 (press Enter)" style="margin-bottom:12px">` +
+    `<div class="row" style="margin-bottom:14px">${chips}</div>` +
     (rows || `<p class="meta">No ${filterStatus === "all" ? "" : filterStatus + " "}prayers yet.</p>`);
+  $("search-box").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && e.target.value.trim()) renderSearch(e.target.value.trim());
+  });
   $("list-view").querySelectorAll(".chip").forEach((c) =>
     c.addEventListener("click", () => { filterStatus = c.dataset.filter; renderList(); }));
   $("list-view").querySelectorAll(".card").forEach((c) =>
     c.addEventListener("click", () => renderDetail(c.dataset.id)));
 }
 
+async function renderSearch(q) {
+  show("list-view");
+  let results;
+  try { results = await api("/api/search?q=" + encodeURIComponent(q)); }
+  catch (e) { $("list-view").innerHTML = `<p class="meta">${esc(e.message)}</p><button class="link" id="btn-back3">&larr; Back</button>`;
+    $("btn-back3").addEventListener("click", renderList); return; }
+  const rows = results.map((i) => `
+    <div class="card clickable" data-id="${esc(i.id)}">
+      <div class="row" style="justify-content:space-between">
+        <strong>${esc(i.title)}</strong>
+        <span><span class="badge">${Math.round(i.score * 100)}% match</span>
+        <span class="badge ${i.status}">${esc(i.status)}</span></span>
+      </div>
+      <div class="meta">${esc(i.date)}${i.requested_by ? " \u00b7 for " + esc(i.requested_by) : ""}</div>
+      <div class="meta" style="margin-top:6px">${esc(i.preview)}</div>
+    </div>`).join("");
+  $("list-view").innerHTML =
+    `<button class="link" id="btn-back3">&larr; All prayers</button>
+     <p class="meta">Results for \u201c${esc(q)}\u201d</p>` +
+    (rows || `<p class="meta">Nothing similar found.</p>`);
+  $("btn-back3").addEventListener("click", renderList);
+  $("list-view").querySelectorAll(".card").forEach((c) =>
+    c.addEventListener("click", () => renderDetail(c.dataset.id)));
+}
+
 // ---------- Detail ----------
+function relatedHtml(s) {
+  if (!s["Related"]) return "";
+  const items = s["Related"].split("\n").map((line) => {
+    const m = line.match(/\[\[([^\]|]+)\|([^\]]+)\]\]/) || line.match(/\[\[([^\]]+)\]\]/);
+    if (!m) return "";
+    return `<li><button class="link rel-link" data-id="${esc(m[1])}">${esc(m[2] || m[1])}</button></li>`;
+  }).join("");
+  return `<div class="section-title">Related</div><ul>${items}</ul>`;
+}
+
 async function renderDetail(id) {
   show("detail-view");
   const n = await api("/api/prayers/" + encodeURIComponent(id));
@@ -102,7 +142,7 @@ async function renderDetail(id) {
         </span>
       </div>
       <div class="meta">${esc(fm.date)}${fm["requested-by"] ? " · for " + esc(fm["requested-by"]) : ""}${fm["answered-date"] ? " · answered " + esc(fm["answered-date"]) : ""}</div>
-      ${sec("Prayer")}${sec("Scripture")}${sec("Reflection")}${sec("How to Pray")}${sec("Updates")}
+      ${sec("Prayer")}${sec("Scripture")}${sec("Reflection")}${sec("How to Pray")}${relatedHtml(s)}${sec("Updates")}
       <div class="row" style="margin-top:18px">
         ${fm.status === "ongoing"
           ? '<button class="primary" id="btn-answered">Mark answered</button>'
@@ -112,6 +152,8 @@ async function renderDetail(id) {
       </div>
     </div>`;
   $("btn-back").addEventListener("click", renderList);
+  $("detail-view").querySelectorAll(".rel-link").forEach((a) =>
+    a.addEventListener("click", () => renderDetail(a.dataset.id)));
   const btnA = $("btn-answered"), btnR = $("btn-reopen"), btnU = $("btn-update"), btnG = $("btn-regen");
   if (btnA) btnA.addEventListener("click", async () => {
     const t = prompt("How was this prayer answered? (optional)") ?? "";

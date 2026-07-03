@@ -6,7 +6,7 @@ from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, R
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
-from . import auth, config, notes, ollama_client
+from . import auth, config, embeddings, notes, ollama_client
 
 log = logging.getLogger("prayervault")
 logging.basicConfig(level=logging.INFO)
@@ -78,6 +78,10 @@ async def _run_ai(note_id: str, kind: str, title: str, text: str, requested_by: 
         result = await ollama_client.generate(kind, title, text, requested_by)
         notes.apply_ai_result(note_id, result)
         log.info("AI response written for %s", note_id)
+        try:
+            await embeddings.add_related_section(note_id)
+        except Exception:
+            log.warning("Embeddings unavailable; skipped Related for %s", note_id)
     except Exception as e:
         log.exception("AI generation failed for %s", note_id)
         notes.apply_ai_result(note_id, None, error=str(e))
@@ -143,6 +147,17 @@ async def regenerate(note_id: str, bg: BackgroundTasks,
     bg.add_task(_run_ai, note_id, fm.get("type", "prayer"), fm.get("title", note_id),
                 sections.get("Prayer", ""), fm.get("requested-by", ""))
     return {"ok": True}
+
+
+@app.get("/api/search")
+async def semantic_search(q: str = "", user: str = Depends(auth.require_auth)):
+    q = q.strip()
+    if not q:
+        return []
+    try:
+        return await embeddings.search(q)
+    except Exception as e:
+        raise HTTPException(503, f"Embedding model unavailable: {e}")
 
 
 @app.get("/api/health")

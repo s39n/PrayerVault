@@ -4,6 +4,7 @@ import os
 VAULT_DIR = os.environ.get("VAULT_DIR", "/vault")
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://host.docker.internal:11434")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.1:8b")
+EMBED_MODEL = os.environ.get("EMBED_MODEL", "nomic-embed-text:latest")
 SESSION_SECRET = os.environ.get("SESSION_SECRET", "")
 AUTH_USERNAME = os.environ.get("AUTH_USERNAME", "sean")
 AUTH_PASSWORD_HASH = os.environ.get("AUTH_PASSWORD_HASH", "")

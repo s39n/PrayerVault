@@ -7,7 +7,7 @@ import yaml
 
 from . import config
 
-SECTION_ORDER = ["Prayer", "Scripture", "Reflection", "How to Pray", "Updates"]
+SECTION_ORDER = ["Prayer", "Scripture", "Reflection", "How to Pray", "Related", "Updates"]
 ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 _\-',]*$")
 
 
