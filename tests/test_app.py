@@ -127,3 +127,21 @@ def test_semantic_search_and_related(monkeypatch):
     # Related renders between How to Pray and Updates in the file
     raw = (notes.vault_dir() / f"{b}.md").read_text()
     assert raw.index("## Related") < raw.index("## Updates")
+
+
+def test_transcribe(monkeypatch):
+    from app import stt
+
+    async def fake_transcribe(data, filename, content_type):
+        assert data == b"fake-audio-bytes"
+        return "Lord, thank you for this day."
+
+    monkeypatch.setattr(stt, "transcribe", fake_transcribe)
+    client.post("/api/login", json={"username": "sean", "password": "testpass"})
+    r = client.post("/api/transcribe",
+                    files={"audio": ("prayer.webm", b"fake-audio-bytes", "audio/webm")})
+    assert r.status_code == 200
+    assert r.json()["text"] == "Lord, thank you for this day."
+
+    r = client.post("/api/transcribe", files={"audio": ("empty.webm", b"", "audio/webm")})
+    assert r.status_code == 422

@@ -203,6 +203,42 @@ function renderNew() {
   $("btn-back2").addEventListener("click", renderList);
   $("np-type").addEventListener("change", (e) =>
     $("np-who-wrap").classList.toggle("hidden", e.target.value !== "request"));
+  let rec = null, chunks = [];
+  const micBtn = $("np-mic");
+  micBtn.addEventListener("click", async () => {
+    if (rec && rec.state === "recording") { rec.stop(); return; }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      $("np-error").textContent = "Microphone needs a secure connection \u2014 use the https:// address.";
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      chunks = [];
+      rec = new MediaRecorder(stream);
+      rec.ondataavailable = (e) => chunks.push(e.data);
+      rec.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        micBtn.disabled = true;
+        micBtn.innerHTML = '<span class="spinner"></span> Transcribing\u2026';
+        try {
+          const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
+          const fd = new FormData();
+          fd.append("audio", blob, "prayer.webm");
+          const r = await fetch("/api/transcribe", { method: "POST", body: fd, credentials: "same-origin" });
+          if (!r.ok) throw new Error((await r.json()).detail || "Transcription failed");
+          const t = (await r.json()).text;
+          const box = $("np-text");
+          box.value = (box.value.trim() ? box.value.trim() + " " : "") + t;
+        } catch (e) { $("np-error").textContent = e.message; }
+        micBtn.disabled = false;
+        micBtn.innerHTML = "&#127908; Record";
+      };
+      rec.start();
+      micBtn.innerHTML = "&#9209; Stop";
+      $("np-error").textContent = "";
+    } catch (e) { $("np-error").textContent = "Microphone access denied: " + e.message; }
+  });
+
   $("np-save").addEventListener("click", async () => {
     try {
       const res = await api("/api/prayers", { method: "POST", body: JSON.stringify({

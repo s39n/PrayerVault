@@ -7,10 +7,14 @@
 #   2. Copy the tunnel token into TUNNEL_TOKEN in the Dockhand env panel
 #   3. In the tunnel's "Public hostnames" add:
 #        pray.safile.us  →  HTTP  →  prayervault:8000
-#      (Cloudflare creates the DNS record automatically)
 #
 # Password: use AUTH_PASSWORD_HASH_B64 (printed by scripts/hash_password.py) —
 # base64, no $ signs, survives every interpolation layer.
+#
+# Voice: the whisper service transcribes recorded prayers locally on the NAS.
+# First start downloads the model (~150 MB for "base"). Mic capture requires
+# a secure context, so voice works on https://pray.safile.us (or localhost),
+# not plain http on the LAN — browsers block the mic there.
 
 services:
   prayervault:
@@ -26,6 +30,7 @@ services:
       - OLLAMA_URL=${OLLAMA_URL:?e.g. http://10.0.0.210:11434 - no /v1 suffix}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.1:8b}
       - EMBED_MODEL=${EMBED_MODEL:-nomic-embed-text:latest}
+      - WHISPER_URL=http://whisper:9000
       # false so login works over plain HTTP on the LAN; external traffic is
       # HTTPS via Cloudflare regardless.
       - COOKIE_SECURE=${COOKIE_SECURE:-false}
@@ -34,9 +39,21 @@ services:
     volumes:
       - "${PRAYERS_DIR:?host folder where prayer notes are stored}:/vault"
 
+  whisper:
+    image: onerahmet/openai-whisper-asr-webservice:latest
+    restart: unless-stopped
+    environment:
+      - ASR_MODEL=${ASR_MODEL:-base}
+      - ASR_ENGINE=faster_whisper
+    volumes:
+      - whisper_cache:/root/.cache
+
   cloudflared:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
     command: tunnel --no-autoupdate run
     environment:
       - TUNNEL_TOKEN=${TUNNEL_TOKEN:?create a tunnel in Cloudflare Zero Trust and paste its token}
+
+volumes:
+  whisper_cache:

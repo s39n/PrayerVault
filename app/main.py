@@ -2,11 +2,12 @@ import asyncio
 import logging
 from pathlib import Path
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, Response
+from fastapi import (BackgroundTasks, Depends, FastAPI, File, HTTPException,
+                     Request, Response, UploadFile)
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
-from . import auth, config, embeddings, notes, ollama_client
+from . import auth, config, embeddings, notes, ollama_client, stt
 
 log = logging.getLogger("prayervault")
 logging.basicConfig(level=logging.INFO)
@@ -147,6 +148,21 @@ async def regenerate(note_id: str, bg: BackgroundTasks,
     bg.add_task(_run_ai, note_id, fm.get("type", "prayer"), fm.get("title", note_id),
                 sections.get("Prayer", ""), fm.get("requested-by", ""))
     return {"ok": True}
+
+
+@app.post("/api/transcribe")
+async def transcribe(audio: UploadFile = File(...),
+                     user: str = Depends(auth.require_auth)):
+    data = await audio.read()
+    if len(data) > 25 * 1024 * 1024:
+        raise HTTPException(413, "Recording too large (25 MB max)")
+    if not data:
+        raise HTTPException(422, "Empty recording")
+    try:
+        text = await stt.transcribe(data, audio.filename, audio.content_type)
+    except Exception as e:
+        raise HTTPException(503, f"Transcription service unavailable: {e}")
+    return {"text": text}
 
 
 @app.get("/api/search")
