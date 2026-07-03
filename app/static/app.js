@@ -196,7 +196,11 @@ function renderNew() {
       </select>
       <div id="np-who-wrap" class="hidden"><label>Requested by / for</label><input id="np-who" placeholder="e.g. The Johnson family"></div>
       <label>Title</label><input id="np-title" placeholder="A few words, e.g. Wisdom for a hard decision">
-      <label>Prayer</label><textarea id="np-text" placeholder="Pour it out here…"></textarea>
+      <div class="row" style="justify-content:space-between;align-items:flex-end">
+        <label style="margin-bottom:4px">Prayer</label>
+        <button id="np-mic" title="Speak your prayer">&#127908; Record</button>
+      </div>
+      <textarea id="np-text" placeholder="Pour it out here… or press Record and speak"></textarea>
       <div class="error-msg" id="np-error"></div>
       <button class="primary" id="np-save" style="margin-top:6px">Save &amp; seek Scripture</button>
     </div>`;
