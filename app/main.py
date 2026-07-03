@@ -183,11 +183,15 @@ async def health(user: str = Depends(auth.require_auth)):
 
 # ---------- Frontend ----------
 
+NO_CACHE = {"Cache-Control": "no-cache"}
+
+
 @app.get("/")
 async def index():
-    return FileResponse(STATIC / "index.html")
+    return FileResponse(STATIC / "index.html", headers=NO_CACHE)
 
 
 @app.get("/app.js")
 async def appjs():
-    return FileResponse(STATIC / "app.js", media_type="application/javascript")
+    return FileResponse(STATIC / "app.js", media_type="application/javascript",
+                        headers=NO_CACHE)
