@@ -5,38 +5,57 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PrayerVault</title>
 <style>
-:root{--bg:#f6f3ec;--card:#fffdf8;--ink:#33302a;--muted:#7a7466;--accent:#5b6e58;--accent-dark:#46543f;--gold:#b28a3e;--line:#e4ddcf;--danger:#9c4a3c}
+:root{--bg:#efe7d6;--bg2:#f5efe1;--card:#fffdf7;--ink:#2f2a22;--muted:#8a8172;--accent:#5b6e58;--accent-dark:#46543f;--gold:#a9843c;--line:#e6ddca;--danger:#9c4a3c}
 *{box-sizing:border-box}
-body{margin:0;font-family:Georgia,'Times New Roman',serif;background:var(--bg);color:var(--ink);line-height:1.55}
-header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--line);background:var(--card)}
-header h1{font-size:1.25rem;margin:0;font-weight:normal;letter-spacing:.5px}
-header h1 em{color:var(--accent);font-style:normal}
-main{max-width:860px;margin:0 auto;padding:20px}
-button{font-family:inherit;font-size:.95rem;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 14px;border-radius:8px;cursor:pointer}
+body{
+  margin:0;color:var(--ink);line-height:1.6;
+  font-family:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,'Times New Roman',serif;
+  background:
+    radial-gradient(120% 80% at 15% 0%, rgba(255,252,244,.9) 0%, rgba(255,252,244,0) 45%),
+    radial-gradient(120% 90% at 85% 12%, rgba(255,249,236,.85) 0%, rgba(255,249,236,0) 40%),
+    radial-gradient(150% 120% at 50% 115%, rgba(216,199,166,.55) 0%, rgba(216,199,166,0) 55%),
+    linear-gradient(180deg, var(--bg2) 0%, var(--bg) 100%);
+  background-attachment:fixed;min-height:100vh;
+}
+header{display:flex;align-items:center;justify-content:space-between;padding:16px 22px;background:transparent}
+header h1{font-size:1.15rem;margin:0;font-weight:normal;letter-spacing:2px;text-transform:uppercase;color:var(--accent-dark)}
+header h1 em{color:var(--gold);font-style:italic;letter-spacing:1px;text-transform:none}
+main{max-width:760px;margin:0 auto;padding:12px 20px 60px}
+button{font-family:inherit;font-size:.95rem;border:1px solid var(--line);background:rgba(255,255,255,.55);color:var(--ink);padding:9px 16px;border-radius:24px;cursor:pointer;transition:background .2s,border-color .2s}
+button:hover{border-color:var(--gold)}
 button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
-button.primary:hover{background:var(--accent-dark)}
-button.link{border:none;background:none;color:var(--accent);text-decoration:underline;padding:4px}
-input,textarea,select{font-family:inherit;font-size:1rem;width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+button.primary:hover{background:var(--accent-dark);border-color:var(--accent-dark)}
+button.link{border:none;background:none;color:var(--accent);padding:4px;border-radius:0}
+button.link:hover{color:var(--gold)}
+input,textarea,select{font-family:inherit;font-size:1rem;width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.75);color:var(--ink)}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--gold)}
 textarea{min-height:140px;resize:vertical}
-label{display:block;margin:12px 0 4px;color:var(--muted);font-size:.9rem}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:14px}
-.card.clickable:hover{border-color:var(--accent);cursor:pointer}
+label{display:block;margin:12px 0 4px;color:var(--muted);font-size:.8rem;text-transform:uppercase;letter-spacing:1.5px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px;margin-bottom:16px;box-shadow:0 6px 24px rgba(120,100,60,.06)}
+.card.clickable{transition:box-shadow .2s,transform .15s}
+.card.clickable:hover{box-shadow:0 10px 30px rgba(120,100,60,.13);transform:translateY(-1px);cursor:pointer}
+/* Featured "a word is needed" hero */
+.hero{background:linear-gradient(180deg,rgba(255,253,247,.9),rgba(250,244,231,.9));border:1px solid var(--line);border-radius:20px;padding:30px 26px;margin-bottom:22px;box-shadow:0 10px 34px rgba(120,100,60,.1)}
+.hero .eyebrow{color:var(--gold)}
+.hero h2{font-size:1.9rem;line-height:1.25;margin:8px 0 10px;font-weight:normal;letter-spacing:.2px}
+.hero p{color:var(--muted);margin:0 0 18px;font-style:italic}
+.eyebrow{font-size:.72rem;text-transform:uppercase;letter-spacing:2.5px;color:var(--muted)}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.chip{border:1px solid var(--line);border-radius:20px;padding:4px 12px;font-size:.85rem;background:var(--card);cursor:pointer;color:var(--muted)}
+.chip{border:1px solid var(--line);border-radius:24px;padding:5px 15px;font-size:.82rem;background:rgba(255,255,255,.5);cursor:pointer;color:var(--muted);letter-spacing:.5px}
 .chip.active{background:var(--accent);border-color:var(--accent);color:#fff}
-.badge{font-size:.75rem;padding:2px 9px;border-radius:10px;background:var(--line);color:var(--muted)}
+.badge{font-size:.72rem;padding:3px 11px;border-radius:12px;background:var(--line);color:var(--muted);letter-spacing:.5px}
 .badge.answered{background:#dfe8d9;color:var(--accent-dark)}
 .badge.pending{background:#f3e8cf;color:var(--gold)}
 .badge.error{background:#f0d9d3;color:var(--danger)}
 .meta{color:var(--muted);font-size:.85rem}
-.section-title{color:var(--accent-dark);font-size:.85rem;text-transform:uppercase;letter-spacing:1.5px;margin:20px 0 6px;border-bottom:1px solid var(--line);padding-bottom:4px}
+.section-title{color:var(--gold);font-size:.72rem;text-transform:uppercase;letter-spacing:2.5px;margin:22px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--line)}
 .scripture-ref{color:var(--gold);font-weight:bold}
-#login-view{max-width:360px;margin:12vh auto}
+#login-view{max-width:380px;margin:12vh auto}
 .error-msg{color:var(--danger);font-size:.9rem;min-height:1.2em;margin-top:8px}
 .hidden{display:none}
 .spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;vertical-align:middle}
 @keyframes spin{to{transform:rotate(360deg)}}
-blockquote{border-left:3px solid var(--gold);margin:8px 0;padding:2px 14px;color:var(--muted)}
+blockquote{border-left:3px solid var(--gold);margin:8px 0;padding:2px 14px;color:var(--muted);font-style:italic}
 ul{padding-left:22px}
 .verse-quote{white-space:pre-wrap}
 </style>

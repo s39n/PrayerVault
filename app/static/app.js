@@ -75,10 +75,25 @@ async function renderList() {
       <div class="meta">${esc(i.date)}${i.requested_by ? " · for " + esc(i.requested_by) : ""}</div>
       <div class="meta" style="margin-top:6px">${esc(i.preview)}${i.preview.length >= 160 ? "…" : ""}</div>
     </div>`).join("");
+  // Featured "a word is needed" \u2014 the ongoing prayer that has waited longest for attention
+  const ongoing = items.filter((i) => i.status === "ongoing");
+  const featured = ongoing.length
+    ? ongoing.slice().sort((a, b) => String(a.date).localeCompare(String(b.date)))[0]
+    : null;
+  const heroHtml = (featured && filterStatus !== "answered") ? `
+    <div class="hero" data-id="${esc(featured.id)}">
+      <div class="eyebrow">A word is needed</div>
+      <h2>${esc(featured.title)}</h2>
+      <p>When you're ready, carry this one back into the light.</p>
+      <button class="link" style="font-size:1rem" data-hero-open="${esc(featured.id)}">Open &rarr;</button>
+    </div>` : "";
   $("list-view").innerHTML =
+    heroHtml +
     `<input id="search-box" placeholder="Search prayers by meaning\u2026 (press Enter)" style="margin-bottom:12px">` +
     `<div class="row" style="margin-bottom:14px">${chips}</div>` +
     (rows || `<p class="meta">No ${filterStatus === "all" ? "" : filterStatus + " "}prayers yet.</p>`);
+  const hero = $("list-view").querySelector(".hero");
+  if (hero) hero.addEventListener("click", () => renderDetail(hero.dataset.id));
   $("search-box").addEventListener("keydown", (e) => {
     if (e.key === "Enter" && e.target.value.trim()) renderSearch(e.target.value.trim());
   });
