@@ -19,7 +19,7 @@
 # AI: the ollama service runs the language model locally on the NAS (no separate
 # machine needed). The one-shot ollama-pull service downloads the chat + embedding
 # models into a shared volume on first start. On CPU-only hardware keep OLLAMA_MODEL
-# small (llama3.2:3b is a good default); an 8B model will be slow without a GPU.
+# small (gemma3:12b is a good default); an 8B model will be slow without a GPU.
 
 services:
   prayervault:
@@ -36,7 +36,7 @@ services:
       - AUTH_PASSWORD_HASH_B64=${AUTH_PASSWORD_HASH_B64:?run scripts/hash_password.py and use the B64 line}
       - SESSION_SECRET=${SESSION_SECRET:?generate with python -c "import secrets; print(secrets.token_hex(32))"}
       - OLLAMA_URL=${OLLAMA_URL:-http://ollama:11434}
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2:3b}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma3:12b}
       - EMBED_MODEL=${EMBED_MODEL:-nomic-embed-text:latest}
       - WHISPER_URL=http://whisper:9000
       # false so login works over plain HTTP on the LAN; external traffic is
@@ -76,7 +76,7 @@ services:
       - -c
       - >
         until ollama list >/dev/null 2>&1; do echo "waiting for ollama..."; sleep 2; done;
-        ollama pull ${OLLAMA_MODEL:-llama3.2:3b};
+        ollama pull ${OLLAMA_MODEL:-gemma3:12b};
         ollama pull ${EMBED_MODEL:-nomic-embed-text:latest}
 
   whisper:
