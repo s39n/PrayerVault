@@ -39,6 +39,7 @@ services:
       - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma3:12b}
       - EMBED_MODEL=${EMBED_MODEL:-nomic-embed-text:latest}
       - WHISPER_URL=http://whisper:9000
+      - NTFY_SERVER=${NTFY_SERVER:-https://ntfy.salife.us}
       # false so login works over plain HTTP on the LAN; external traffic is
       # HTTPS via Cloudflare regardless.
       - COOKIE_SECURE=${COOKIE_SECURE:-false}
