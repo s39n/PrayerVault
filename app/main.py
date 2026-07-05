@@ -198,12 +198,15 @@ async def health(user: str = Depends(auth.require_auth)):
 
 class SettingsBody(BaseModel):
     morning: dict = Field(default_factory=dict)
+    prompts: dict = Field(default_factory=dict)
 
 
 @app.get("/api/settings")
 async def get_settings(user: str = Depends(auth.require_auth)):
     s = settings.load()
     s["ntfy_server"] = config.NTFY_SERVER
+    s["prompt_defaults"] = {"system": ollama_client.SYSTEM_PROMPT,
+                            "answer": ollama_client.ANSWER_PROMPT}
     return s
 
 

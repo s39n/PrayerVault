@@ -4,7 +4,7 @@ import re
 
 import httpx
 
-from . import config
+from . import config, settings
 
 SYSTEM_PROMPT = """You are a pastoral assistant grounded in Reformed (Presbyterian) theology,
 consistent with the Westminster Standards. You will be given a personal prayer or a prayer
@@ -26,6 +26,34 @@ reminds us..."). No markdown headers.
 adoration, confession, thanksgiving, supplication. Each a single sentence.
 
 Choose real passages and quote references accurately. Do not invent verse numbers."""
+
+ANSWER_PROMPT = """You are a pastoral teacher grounded in Reformed (Presbyterian) theology,
+consistent with the Westminster Standards. You will be given a question. Respond ONLY with a
+JSON object with these keys:
+
+"scripture": an array of 2-4 objects, each with:
+  "book" (full book name, singular "Psalm", e.g. "Psalm", "John", "1 Peter"),
+  "chapter" (integer),
+  "verse_start" (integer),
+  "verse_end" (integer, same as verse_start for a single verse),
+  "why" (one sentence: how this passage speaks to the question)
+
+"answer": 2-3 short paragraphs answering the question from Scripture. Warm and pastoral,
+God-centered, honest, anchored in the character and promises of God in Christ. Reference the
+passages you chose by name (e.g. "As Romans 8 reminds us..."). Point to Christ and the gospel.
+If the question is outside what Scripture directly addresses, say so humbly rather than
+speculating. No markdown headers.
+
+Choose real passages and quote references accurately. Do not invent verse numbers."""
+
+
+def _prompt(name: str, default: str) -> str:
+    """Return the user's custom prompt from settings, or the built-in default if blank."""
+    try:
+        custom = settings.load()["prompts"].get(name, "").strip()
+    except Exception:
+        custom = ""
+    return custom or default
 
 
 def _wikilink(book: str, chapter: int, v1: int, v2: int) -> str:
@@ -68,7 +96,7 @@ async def generate(kind: str, title: str, text: str, requested_by: str = "") -> 
         "format": "json",
         "options": {"temperature": 0.6},
         "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": _prompt("system", SYSTEM_PROMPT)},
             {"role": "user", "content": user_msg},
         ],
     }
@@ -82,26 +110,6 @@ async def generate(kind: str, title: str, text: str, requested_by: str = "") -> 
     return _shape(raw)
 
 
-ANSWER_PROMPT = """You are a pastoral teacher grounded in Reformed (Presbyterian) theology,
-consistent with the Westminster Standards. You will be given a question. Respond ONLY with a
-JSON object with these keys:
-
-"scripture": an array of 2-4 objects, each with:
-  "book" (full book name, singular "Psalm", e.g. "Psalm", "John", "1 Peter"),
-  "chapter" (integer),
-  "verse_start" (integer),
-  "verse_end" (integer, same as verse_start for a single verse),
-  "why" (one sentence: how this passage speaks to the question)
-
-"answer": 2-3 short paragraphs answering the question from Scripture. Warm and pastoral,
-God-centered, honest, anchored in the character and promises of God in Christ. Reference the
-passages you chose by name (e.g. "As Romans 8 reminds us..."). Point to Christ and the gospel.
-If the question is outside what Scripture directly addresses, say so humbly rather than
-speculating. No markdown headers.
-
-Choose real passages and quote references accurately. Do not invent verse numbers."""
-
-
 async def ask(question: str) -> dict:
     """Answer a free-form question with Scripture references + a Reformed reflection."""
     payload = {
@@ -110,7 +118,7 @@ async def ask(question: str) -> dict:
         "format": "json",
         "options": {"temperature": 0.6},
         "messages": [
-            {"role": "system", "content": ANSWER_PROMPT},
+            {"role": "system", "content": _prompt("answer", ANSWER_PROMPT)},
             {"role": "user", "content": question.strip()},
         ],
     }

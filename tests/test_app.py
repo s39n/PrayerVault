@@ -183,3 +183,19 @@ def test_transcribe(monkeypatch):
 
     r = client.post("/api/transcribe", files={"audio": ("empty.webm", b"", "audio/webm")})
     assert r.status_code == 422
+
+
+def test_prompt_settings():
+    from app import ollama_client
+    client.post("/api/login", json={"username": "sean", "password": "testpass"})
+    s = client.get("/api/settings").json()
+    assert s["prompt_defaults"]["system"] and s["prompt_defaults"]["answer"]
+    assert "prompts" in s
+    r = client.post("/api/settings", json={"prompts": {"system": "CUSTOM SYSTEM", "answer": ""}})
+    assert r.status_code == 200
+    assert r.json()["prompts"]["system"] == "CUSTOM SYSTEM"
+    # custom used when set; falls back to the passed default when blank
+    assert ollama_client._prompt("system", "DEFAULT") == "CUSTOM SYSTEM"
+    assert ollama_client._prompt("answer", "DEFAULT") == "DEFAULT"
+    # morning settings survive a prompts-only save
+    assert "morning" in r.json()

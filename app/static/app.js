@@ -297,6 +297,10 @@ async function renderYou() {
   try { s = await api("/api/settings"); }
   catch (e) { $("you-view").innerHTML = `<p class="meta">${esc(e.message)}</p>`; return; }
   const m = s.morning;
+  const defs = s.prompt_defaults || { system: "", answer: "" };
+  const cur = s.prompts || { system: "", answer: "" };
+  const sysText = (cur.system && cur.system.trim()) ? cur.system : defs.system;
+  const ansText = (cur.answer && cur.answer.trim()) ? cur.answer : defs.answer;
   const opts = (n, sel) => Array.from({ length: n }, (_, i) =>
     `<option value="${i}" ${i === sel ? "selected" : ""}>${String(i).padStart(2, "0")}</option>`).join("");
   $("you-view").innerHTML = `
@@ -327,6 +331,20 @@ async function renderYou() {
         <button id="mp-test">Send test push</button>
         <span id="mp-status" class="meta"></span>
       </div>
+    </div>
+    <div class="card">
+      <div class="section-title">AI prompts</div>
+      <p class="meta">These instructions steer your local model's voice. They start as the built-in Reformed (Westminster) prompts — edit them to change the tone, or use "Reset to built-in" to restore the originals. The models must still return the same JSON, so keep the parts describing the JSON keys.</p>
+      <label>Prayer &amp; request generation</label>
+      <textarea id="pr-system" spellcheck="false" style="min-height:220px;font-size:.88rem;line-height:1.5">${esc(sysText)}</textarea>
+      <label>Ask (Scripture Q&amp;A)</label>
+      <textarea id="pr-answer" spellcheck="false" style="min-height:220px;font-size:.88rem;line-height:1.5">${esc(ansText)}</textarea>
+      <div class="error-msg" id="pr-error"></div>
+      <div class="row" style="margin-top:12px">
+        <button class="primary" id="pr-save">Save prompts</button>
+        <button id="pr-reset">Reset to built-in</button>
+        <span id="pr-status" class="meta"></span>
+      </div>
     </div>`;
   const gather = () => ({ morning: {
     enabled: $("mp-enabled").checked,
@@ -351,6 +369,27 @@ async function renderYou() {
       $("mp-status").textContent = "Test push sent — check your ntfy app.";
     } catch (e) { $("mp-error").textContent = e.message; }
     btn.disabled = false;
+  });
+  const savePrompts = (system, answer) =>
+    api("/api/settings", { method: "POST", body: JSON.stringify({ prompts: { system, answer } }) });
+  $("pr-save").addEventListener("click", async () => {
+    $("pr-error").textContent = ""; $("pr-status").textContent = "";
+    try {
+      const sv = $("pr-system").value, av = $("pr-answer").value;
+      await savePrompts(
+        sv.trim() === defs.system.trim() ? "" : sv,
+        av.trim() === defs.answer.trim() ? "" : av);
+      $("pr-status").textContent = "Prompts saved.";
+    } catch (e) { $("pr-error").textContent = e.message; }
+  });
+  $("pr-reset").addEventListener("click", async () => {
+    $("pr-error").textContent = ""; $("pr-status").textContent = "";
+    try {
+      await savePrompts("", "");
+      $("pr-system").value = defs.system;
+      $("pr-answer").value = defs.answer;
+      $("pr-status").textContent = "Reset to built-in.";
+    } catch (e) { $("pr-error").textContent = e.message; }
   });
 }
 
