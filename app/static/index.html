@@ -58,6 +58,25 @@ label{display:block;margin:12px 0 4px;color:var(--muted);font-size:.8rem;text-tr
 blockquote{border-left:3px solid var(--gold);margin:8px 0;padding:2px 14px;color:var(--muted);font-style:italic}
 ul{padding-left:22px}
 .verse-quote{white-space:pre-wrap}
+/* Nav */
+nav#nav{display:flex;gap:8px;justify-content:center;padding:4px 20px 2px}
+.nav-item{border:none;background:none;color:var(--muted);border-radius:0;padding:6px 14px 10px;font-size:.95rem;letter-spacing:.5px;border-bottom:2px solid transparent}
+.nav-item:hover{color:var(--accent-dark);border-color:var(--line)}
+.nav-item.active{color:var(--accent-dark);border-color:var(--gold)}
+/* Today greeting + verse */
+.greeting{text-align:center;margin:18px 0 24px}
+.greeting .eyebrow{display:block;margin-bottom:6px}
+.greeting h2{font-size:1.7rem;font-weight:normal;margin:0}
+.verse-card{background:linear-gradient(180deg,rgba(255,253,247,.95),rgba(249,242,228,.95));border:1px solid var(--line);border-radius:20px;padding:26px;margin-bottom:22px;text-align:center;box-shadow:0 8px 28px rgba(120,100,60,.08)}
+.verse-card .verse-text{font-size:1.25rem;line-height:1.5;font-style:italic;color:var(--ink);margin:6px 0 12px}
+.verse-card .verse-ref{color:var(--gold);letter-spacing:1px;font-size:.9rem}
+.next-step{text-align:center;color:var(--muted);font-style:italic;margin:18px 0}
+/* Fruit gallery */
+.fruit-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}
+.fruit-card{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:14px;padding:18px;box-shadow:0 6px 24px rgba(120,100,60,.06);transition:box-shadow .2s,transform .15s;cursor:pointer}
+.fruit-card:hover{box-shadow:0 10px 30px rgba(120,100,60,.13);transform:translateY(-1px)}
+.fruit-card h3{font-size:1.1rem;font-weight:normal;margin:0 0 4px}
+.fruit-card .answered-on{color:var(--gold);font-size:.78rem;text-transform:uppercase;letter-spacing:1.5px}
 </style>
 </head>
 <body>
@@ -68,6 +87,13 @@ ul{padding-left:22px}
     <button id="btn-logout" class="link">Sign out</button>
   </div>
 </header>
+<nav id="nav" class="hidden">
+  <button class="nav-item" data-nav="today">Today</button>
+  <button class="nav-item" data-nav="prayers">Prayers</button>
+  <button class="nav-item" data-nav="fruit">Fruit</button>
+  <button class="nav-item" data-nav="ask">Ask</button>
+  <button class="nav-item" data-nav="you">You</button>
+</nav>
 <main>
   <div id="login-view" class="card hidden">
     <h2 style="margin-top:0;font-weight:normal">Sign in</h2>
@@ -77,7 +103,11 @@ ul{padding-left:22px}
     <div class="error-msg" id="login-error"></div>
     <button id="btn-login" class="primary" style="width:100%;margin-top:6px">Sign in</button>
   </div>
+  <div id="today-view" class="hidden"></div>
   <div id="list-view" class="hidden"></div>
+  <div id="fruit-view" class="hidden"></div>
+  <div id="ask-view" class="hidden"></div>
+  <div id="you-view" class="hidden"></div>
   <div id="detail-view" class="hidden"></div>
   <div id="new-view" class="hidden"></div>
 </main>

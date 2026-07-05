@@ -1,13 +1,29 @@
 "use strict";
 const $ = (id) => document.getElementById(id);
-const views = ["login-view", "list-view", "detail-view", "new-view"];
+const views = ["login-view", "today-view", "list-view", "fruit-view", "ask-view", "you-view", "detail-view", "new-view"];
 let filterStatus = "ongoing";
 let pollTimer = null;
 
 function show(view) {
   views.forEach((v) => $(v).classList.toggle("hidden", v !== view));
-  $("header-actions").classList.toggle("hidden", view === "login-view");
+  const loggedOut = view === "login-view";
+  $("header-actions").classList.toggle("hidden", loggedOut);
+  $("nav").classList.toggle("hidden", loggedOut);
   if (pollTimer && view !== "detail-view") { clearInterval(pollTimer); pollTimer = null; }
+}
+
+// Highlight the active nav tab (today | prayers | fruit)
+function setNav(name) {
+  document.querySelectorAll(".nav-item").forEach((b) =>
+    b.classList.toggle("active", b.dataset.nav === name));
+}
+
+// The ongoing prayer that has waited longest for attention
+function longestWaiting(items) {
+  const ongoing = items.filter((i) => i.status === "ongoing");
+  return ongoing.length
+    ? ongoing.slice().sort((a, b) => String(a.date).localeCompare(String(b.date)))[0]
+    : null;
 }
 
 async function api(path, opts = {}) {
@@ -58,6 +74,7 @@ const aiBadge = (ai) =>
 // ---------- List ----------
 async function renderList() {
   show("list-view");
+  setNav("prayers");
   const items = await api("/api/prayers");
   const filtered = items.filter((i) => filterStatus === "all" || i.status === filterStatus);
   const chips = ["ongoing", "answered", "all"].map((f) =>
@@ -76,10 +93,7 @@ async function renderList() {
       <div class="meta" style="margin-top:6px">${esc(i.preview)}${i.preview.length >= 160 ? "…" : ""}</div>
     </div>`).join("");
   // Featured "a word is needed" \u2014 the ongoing prayer that has waited longest for attention
-  const ongoing = items.filter((i) => i.status === "ongoing");
-  const featured = ongoing.length
-    ? ongoing.slice().sort((a, b) => String(a.date).localeCompare(String(b.date)))[0]
-    : null;
+  const featured = longestWaiting(items);
   const heroHtml = (featured && filterStatus !== "answered") ? `
     <div class="hero" data-id="${esc(featured.id)}">
       <div class="eyebrow">A word is needed</div>
@@ -126,6 +140,232 @@ async function renderSearch(q) {
   $("btn-back3").addEventListener("click", renderList);
   $("list-view").querySelectorAll(".card").forEach((c) =>
     c.addEventListener("click", () => renderDetail(c.dataset.id)));
+}
+
+// ---------- Today ----------
+// Curated, offline verse-of-the-day list (Reformed-friendly). No external calls.
+const VERSES = [
+  ["The Lord is my shepherd; I shall not want.", "Psalm 23:1"],
+  ["Cast all your anxieties on him, because he cares for you.", "1 Peter 5:7"],
+  ["Be still, and know that I am God.", "Psalm 46:10"],
+  ["The steadfast love of the Lord never ceases; his mercies are new every morning.", "Lamentations 3:22-23"],
+  ["Trust in the Lord with all your heart, and do not lean on your own understanding.", "Proverbs 3:5"],
+  ["I can do all things through him who strengthens me.", "Philippians 4:13"],
+  ["Come to me, all who labor and are heavy laden, and I will give you rest.", "Matthew 11:28"],
+  ["The Lord is near to all who call on him, to all who call on him in truth.", "Psalm 145:18"],
+  ["Do not be anxious about anything, but in everything by prayer let your requests be made known to God.", "Philippians 4:6"],
+  ["Wait for the Lord; be strong, and let your heart take courage.", "Psalm 27:14"],
+  ["And we know that for those who love God all things work together for good.", "Romans 8:28"],
+  ["He heals the brokenhearted and binds up their wounds.", "Psalm 147:3"],
+  ["The Lord will fight for you, and you have only to be silent.", "Exodus 14:14"],
+  ["My grace is sufficient for you, for my power is made perfect in weakness.", "2 Corinthians 12:9"],
+  ["Fear not, for I am with you; be not dismayed, for I am your God.", "Isaiah 41:10"],
+  ["This is the day that the Lord has made; let us rejoice and be glad in it.", "Psalm 118:24"],
+  ["The Lord is my light and my salvation; whom shall I fear?", "Psalm 27:1"],
+  ["Whom have I in heaven but you? And there is nothing on earth that I desire besides you.", "Psalm 73:25"],
+  ["Delight yourself in the Lord, and he will give you the desires of your heart.", "Psalm 37:4"],
+  ["The name of the Lord is a strong tower; the righteous man runs into it and is safe.", "Proverbs 18:10"],
+  ["Weeping may tarry for the night, but joy comes with the morning.", "Psalm 30:5"],
+  ["Let us hold fast the confession of our hope without wavering, for he who promised is faithful.", "Hebrews 10:23"],
+  ["Bless the Lord, O my soul, and forget not all his benefits.", "Psalm 103:2"],
+  ["In peace I will both lie down and sleep; for you alone, O Lord, make me dwell in safety.", "Psalm 4:8"],
+];
+
+function verseOfDay() {
+  const start = new Date(new Date().getFullYear(), 0, 0);
+  const day = Math.floor((Date.now() - start) / 86400000);
+  return VERSES[day % VERSES.length];
+}
+
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 18) return "Good afternoon";
+  return "Good evening";
+}
+
+async function renderToday() {
+  show("today-view");
+  setNav("today");
+  const items = await api("/api/prayers");
+  const [text, ref] = verseOfDay();
+  const featured = longestWaiting(items);
+  const answered = items.filter((i) => i.status === "answered");
+  const today = new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+
+  const heroHtml = featured ? `
+    <div class="hero" data-id="${esc(featured.id)}">
+      <div class="eyebrow">A word is needed</div>
+      <h2>${esc(featured.title)}</h2>
+      <p>Carry this one back into the light this morning.</p>
+      <button class="link" style="font-size:1rem">Open &rarr;</button>
+    </div>
+    <div class="next-step">The step before you now: sit with this prayer for a moment before the day begins.</div>`
+    : (answered.length
+      ? `<div class="next-step">No prayers are waiting on you today. Visit <strong>Fruit</strong> to remember how God has answered.</div>`
+      : `<div class="next-step">Nothing is on your heart here yet. When you're ready, bring a matter into the light.</div>
+         <div class="row" style="justify-content:center"><button class="primary" id="today-new">+ Bring a matter</button></div>`);
+
+  $("today-view").innerHTML = `
+    <div class="greeting">
+      <span class="eyebrow">${esc(today)}</span>
+      <h2>${greeting()}, Sean.</h2>
+    </div>
+    <div class="verse-card">
+      <div class="eyebrow">A word for today</div>
+      <div class="verse-text">“${esc(text)}”</div>
+      <div class="verse-ref">${esc(ref)}</div>
+    </div>
+    ${heroHtml}`;
+
+  const hero = $("today-view").querySelector(".hero");
+  if (hero) hero.addEventListener("click", () => renderDetail(hero.dataset.id));
+  const tn = $("today-new");
+  if (tn) tn.addEventListener("click", renderNew);
+}
+
+// ---------- Fruit (answered prayers) ----------
+async function renderFruit() {
+  show("fruit-view");
+  setNav("fruit");
+  const items = await api("/api/prayers");
+  const answered = items.filter((i) => i.status === "answered")
+    .sort((a, b) => String(b.answered_date || b.date).localeCompare(String(a.answered_date || a.date)));
+  const cards = answered.map((i) => `
+    <div class="fruit-card" data-id="${esc(i.id)}">
+      <div class="answered-on">Answered${i.answered_date ? " · " + esc(i.answered_date) : ""}</div>
+      <h3>${esc(i.title)}</h3>
+      <div class="meta" style="margin-top:6px">${esc(i.preview)}${i.preview.length >= 160 ? "…" : ""}</div>
+    </div>`).join("");
+  $("fruit-view").innerHTML = `
+    <div class="greeting">
+      <span class="eyebrow">Fruit</span>
+      <h2>How God has answered</h2>
+    </div>
+    ${answered.length
+      ? `<div class="fruit-grid">${cards}</div>`
+      : `<p class="meta" style="text-align:center">No answered prayers yet. Mark a prayer answered and it will bloom here.</p>`}`;
+  $("fruit-view").querySelectorAll(".fruit-card").forEach((c) =>
+    c.addEventListener("click", () => renderDetail(c.dataset.id)));
+}
+
+// ---------- Ask (Scripture Q&A) ----------
+function renderAsk() {
+  show("ask-view");
+  setNav("ask");
+  $("ask-view").innerHTML = `
+    <div class="greeting">
+      <span class="eyebrow">Ask</span>
+      <h2>Bring a question to Scripture</h2>
+    </div>
+    <div class="card">
+      <label>Your question</label>
+      <textarea id="ask-q" placeholder="e.g. How do I trust God when the future feels uncertain?"></textarea>
+      <div class="error-msg" id="ask-error"></div>
+      <button class="primary" id="ask-go" style="margin-top:6px">Seek an answer</button>
+    </div>
+    <div id="ask-result"></div>`;
+  $("ask-go").addEventListener("click", doAsk);
+  $("ask-q").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) doAsk();
+  });
+}
+
+async function doAsk() {
+  const q = $("ask-q").value.trim();
+  if (!q) { $("ask-error").textContent = "Type a question first."; return; }
+  $("ask-error").textContent = "";
+  const btn = $("ask-go");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Searching Scripture…';
+  $("ask-result").innerHTML = "";
+  try {
+    const r = await api("/api/ask", { method: "POST", body: JSON.stringify({ question: q }) });
+    $("ask-result").innerHTML = `
+      <div class="card">
+        ${r.scripture_md ? `<div class="section-title">Scripture</div>${md(r.scripture_md)}` : ""}
+        ${r.answer ? `<div class="section-title">A word</div>${md(r.answer)}` : ""}
+        <p class="meta" style="margin-top:16px;font-style:italic">An aid for reflection, drawn from Scripture — not a replacement for reading God's Word or the counsel of your church.</p>
+      </div>`;
+  } catch (e) {
+    $("ask-error").textContent = e.message;
+  }
+  btn.disabled = false;
+  btn.innerHTML = "Seek an answer";
+}
+
+// ---------- You (settings) ----------
+async function renderYou() {
+  show("you-view");
+  setNav("you");
+  $("you-view").innerHTML = `
+    <div class="greeting"><span class="eyebrow">You</span><h2>Settings</h2></div>
+    <p class="meta" style="text-align:center">Loading…</p>`;
+  let s;
+  try { s = await api("/api/settings"); }
+  catch (e) { $("you-view").innerHTML = `<p class="meta">${esc(e.message)}</p>`; return; }
+  const m = s.morning;
+  const opts = (n, sel) => Array.from({ length: n }, (_, i) =>
+    `<option value="${i}" ${i === sel ? "selected" : ""}>${String(i).padStart(2, "0")}</option>`).join("");
+  $("you-view").innerHTML = `
+    <div class="greeting"><span class="eyebrow">You</span><h2>Settings</h2></div>
+    <div class="card">
+      <div class="section-title">Morning prayer prompt</div>
+      <label style="text-transform:none;letter-spacing:0;color:var(--ink);margin-top:6px">
+        <input type="checkbox" id="mp-enabled" ${m.enabled ? "checked" : ""} style="width:auto;margin-right:8px;vertical-align:middle">
+        Send me a morning prompt
+      </label>
+      <label>Delivery</label>
+      <select id="mp-delivery">
+        <option value="ntfy" ${m.delivery === "ntfy" ? "selected" : ""}>ntfy push notification</option>
+        <option value="none" ${m.delivery === "none" ? "selected" : ""}>In-app only (no push)</option>
+      </select>
+      <label>ntfy topic</label>
+      <input id="mp-topic" value="${esc(m.ntfy_topic)}" placeholder="e.g. sean-prayer-7fq3k9">
+      <p class="meta">Install the ntfy app and subscribe to this exact topic on ${esc(s.ntfy_server)}. Choose something private and hard to guess — anyone who knows the topic can read it.</p>
+      <label>Time</label>
+      <div class="row">
+        <select id="mp-hour" style="width:auto">${opts(24, m.hour)}</select>
+        <span>:</span>
+        <select id="mp-min" style="width:auto">${opts(60, m.minute)}</select>
+      </div>
+      <div class="error-msg" id="mp-error"></div>
+      <div class="row" style="margin-top:14px">
+        <button class="primary" id="mp-save">Save</button>
+        <button id="mp-test">Send test push</button>
+        <span id="mp-status" class="meta"></span>
+      </div>
+    </div>`;
+
+  const gather = () => ({ morning: {
+    enabled: $("mp-enabled").checked,
+    delivery: $("mp-delivery").value,
+    ntfy_topic: $("mp-topic").value.trim(),
+    hour: parseInt($("mp-hour").value, 10),
+    minute: parseInt($("mp-min").value, 10),
+  }});
+
+  $("mp-save").addEventListener("click", async () => {
+    $("mp-error").textContent = "";
+    $("mp-status").textContent = "";
+    try {
+      await api("/api/settings", { method: "POST", body: JSON.stringify(gather()) });
+      $("mp-status").textContent = "Saved.";
+    } catch (e) { $("mp-error").textContent = e.message; }
+  });
+
+  $("mp-test").addEventListener("click", async () => {
+    $("mp-error").textContent = "";
+    $("mp-status").textContent = "";
+    const btn = $("mp-test");
+    btn.disabled = true;
+    try {
+      await api("/api/settings", { method: "POST", body: JSON.stringify(gather()) });
+      await api("/api/notify/test", { method: "POST", body: JSON.stringify({}) });
+      $("mp-status").textContent = "Test push sent — check your ntfy app.";
+    } catch (e) { $("mp-error").textContent = e.message; }
+    btn.disabled = false;
+  });
 }
 
 // ---------- Detail ----------
@@ -276,7 +516,7 @@ async function doLogin() {
     await api("/api/login", { method: "POST", body: JSON.stringify({
       username: $("login-user").value.trim(), password: $("login-pass").value,
     })});
-    renderList();
+    renderToday();
   } catch (e) { if (e.message !== "auth") $("login-error").textContent = e.message; else $("login-error").textContent = "Invalid username or password"; }
 }
 
@@ -284,5 +524,14 @@ $("btn-login").addEventListener("click", doLogin);
 $("login-pass").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
 $("btn-new").addEventListener("click", renderNew);
 $("btn-logout").addEventListener("click", async () => { await api("/api/logout", { method: "POST" }); show("login-view"); });
+document.querySelectorAll(".nav-item").forEach((b) =>
+  b.addEventListener("click", () => {
+    const n = b.dataset.nav;
+    if (n === "today") renderToday();
+    else if (n === "fruit") renderFruit();
+    else if (n === "ask") renderAsk();
+    else if (n === "you") renderYou();
+    else { filterStatus = "ongoing"; renderList(); }
+  }));
 
-api("/api/me").then(renderList).catch(() => show("login-view"));
+api("/api/me").then(renderToday).catch(() => show("login-view"));

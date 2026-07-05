@@ -82,6 +82,47 @@ async def generate(kind: str, title: str, text: str, requested_by: str = "") -> 
     return _shape(raw)
 
 
+ANSWER_PROMPT = """You are a pastoral teacher grounded in Reformed (Presbyterian) theology,
+consistent with the Westminster Standards. You will be given a question. Respond ONLY with a
+JSON object with these keys:
+
+"scripture": an array of 2-4 objects, each with:
+  "book" (full book name, singular "Psalm", e.g. "Psalm", "John", "1 Peter"),
+  "chapter" (integer),
+  "verse_start" (integer),
+  "verse_end" (integer, same as verse_start for a single verse),
+  "why" (one sentence: how this passage speaks to the question)
+
+"answer": 2-3 short paragraphs answering the question from Scripture. Warm and pastoral,
+God-centered, honest, anchored in the character and promises of God in Christ. Reference the
+passages you chose by name (e.g. "As Romans 8 reminds us..."). Point to Christ and the gospel.
+If the question is outside what Scripture directly addresses, say so humbly rather than
+speculating. No markdown headers.
+
+Choose real passages and quote references accurately. Do not invent verse numbers."""
+
+
+async def ask(question: str) -> dict:
+    """Answer a free-form question with Scripture references + a Reformed reflection."""
+    payload = {
+        "model": config.OLLAMA_MODEL,
+        "stream": False,
+        "format": "json",
+        "options": {"temperature": 0.6},
+        "messages": [
+            {"role": "system", "content": ANSWER_PROMPT},
+            {"role": "user", "content": question.strip()},
+        ],
+    }
+    async with httpx.AsyncClient(timeout=config.OLLAMA_TIMEOUT) as client:
+        r = await client.post(f"{config.OLLAMA_URL}/api/chat", json=payload)
+        r.raise_for_status()
+        content = r.json()["message"]["content"]
+    content = re.sub(r"^```(json)?|```$", "", content.strip(), flags=re.MULTILINE).strip()
+    raw = json.loads(content)
+    return {"scripture_md": _shape(raw)["scripture_md"], "answer": str(raw.get("answer", "")).strip()}
+
+
 async def health() -> dict:
     try:
         async with httpx.AsyncClient(timeout=5) as client:

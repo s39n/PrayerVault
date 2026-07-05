@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import logging
 from pathlib import Path
 
@@ -7,7 +8,7 @@ from fastapi import (BackgroundTasks, Depends, FastAPI, File, HTTPException,
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
-from . import auth, config, embeddings, notes, ollama_client, stt
+from . import auth, config, embeddings, notes, notify, ollama_client, settings, stt
 
 log = logging.getLogger("prayervault")
 logging.basicConfig(level=logging.INFO)
@@ -176,9 +177,77 @@ async def semantic_search(q: str = "", user: str = Depends(auth.require_auth)):
         raise HTTPException(503, f"Embedding model unavailable: {e}")
 
 
+class AskBody(BaseModel):
+    question: str = Field(min_length=1, max_length=1000)
+
+
+@app.post("/api/ask")
+async def ask_scripture(body: AskBody, user: str = Depends(auth.require_auth)):
+    try:
+        return await ollama_client.ask(body.question)
+    except Exception as e:
+        raise HTTPException(503, f"Model unavailable: {e}")
+
+
 @app.get("/api/health")
 async def health(user: str = Depends(auth.require_auth)):
     return await ollama_client.health()
+
+
+# ---------- Settings & morning prompt ----------
+
+class SettingsBody(BaseModel):
+    morning: dict = Field(default_factory=dict)
+
+
+@app.get("/api/settings")
+async def get_settings(user: str = Depends(auth.require_auth)):
+    s = settings.load()
+    s["ntfy_server"] = config.NTFY_SERVER
+    return s
+
+
+@app.post("/api/settings")
+async def update_settings(body: SettingsBody, user: str = Depends(auth.require_auth)):
+    saved = settings.save(body.model_dump())
+    saved["ntfy_server"] = config.NTFY_SERVER
+    return saved
+
+
+@app.post("/api/notify/test")
+async def notify_test(user: str = Depends(auth.require_auth)):
+    m = settings.load()["morning"]
+    if m["delivery"] != "ntfy" or not m["ntfy_topic"]:
+        raise HTTPException(422, "Choose ntfy delivery and set a topic first.")
+    try:
+        title, body = notify.compose_morning()
+        await notify.send_ntfy(m["ntfy_topic"], title, body)
+    except Exception as e:
+        raise HTTPException(503, f"Push failed: {e}")
+    return {"ok": True}
+
+
+async def _morning_loop():
+    """Fire the morning prompt once per day at the configured time."""
+    last_sent = None
+    while True:
+        try:
+            m = settings.load()["morning"]
+            now = datetime.datetime.now()
+            if (m["enabled"] and m["delivery"] != "none"
+                    and now.hour == m["hour"] and now.minute == m["minute"]
+                    and last_sent != now.date()):
+                if await notify.send_morning({"morning": m}):
+                    last_sent = now.date()
+                    log.info("Morning prompt sent via %s", m["delivery"])
+        except Exception:
+            log.exception("Morning scheduler error")
+        await asyncio.sleep(30)
+
+
+@app.on_event("startup")
+async def _start_scheduler():
+    asyncio.create_task(_morning_loop())
 
 
 # ---------- Frontend ----------

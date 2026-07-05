@@ -9,12 +9,18 @@ WHISPER_URL = os.environ.get("WHISPER_URL", "http://whisper:9000")
 SESSION_SECRET = os.environ.get("SESSION_SECRET", "")
 AUTH_USERNAME = os.environ.get("AUTH_USERNAME", "sean")
 AUTH_PASSWORD_HASH = os.environ.get("AUTH_PASSWORD_HASH", "")
-if not AUTH_PASSWORD_HASH:
-    # $-free alternative for compose/Dockhand env panels that mangle bcrypt hashes
+# A real bcrypt hash starts with $2a/$2b/$2y. If AUTH_PASSWORD_HASH is empty or got
+# mangled (e.g. PowerShell double-quotes eating the $ segments), fall back to the
+# $-free base64 form so a broken value can never silently override the good one.
+if not AUTH_PASSWORD_HASH.startswith("$2"):
     _b64 = os.environ.get("AUTH_PASSWORD_HASH_B64", "").strip()
     if _b64:
         AUTH_PASSWORD_HASH = base64.b64decode(_b64).decode()
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "true").lower() == "true"
+NTFY_SERVER = os.environ.get("NTFY_SERVER", "https://ntfy.sh")
+# Where runtime settings (morning prompt config) are stored. Defaults inside the vault
+# under .prayervault/ — add that folder to your vault's .gitignore if you don't want it synced.
+SETTINGS_FILE = os.environ.get("SETTINGS_FILE", "")
 SESSION_MAX_AGE = int(os.environ.get("SESSION_MAX_AGE", str(60 * 60 * 24 * 14)))
 OLLAMA_TIMEOUT = int(os.environ.get("OLLAMA_TIMEOUT", "300"))
 

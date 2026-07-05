@@ -4,3 +4,5 @@ __pycache__/
 .pytest_cache/
 caddy_data/
 caddy_config/
+run.ps1
+vault/

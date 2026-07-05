@@ -127,6 +127,7 @@ def list_notes() -> list[dict]:
             "status": fm.get("status", "ongoing"),
             "ai": fm.get("ai", "done"),
             "requested_by": fm.get("requested-by", ""),
+            "answered_date": str(fm.get("answered-date", "")),
             "preview": (sections.get("Prayer", "")[:160]),
         })
     return out
