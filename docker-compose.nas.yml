@@ -15,6 +15,11 @@
 # First start downloads the model (~150 MB for "base"). Mic capture requires
 # a secure context, so voice works on https://pray.safile.us (or localhost),
 # not plain http on the LAN — browsers block the mic there.
+#
+# AI: the ollama service runs the language model locally on the NAS (no separate
+# machine needed). The one-shot ollama-pull service downloads the chat + embedding
+# models into a shared volume on first start. On CPU-only hardware keep OLLAMA_MODEL
+# small (llama3.2:3b is a good default); an 8B model will be slow without a GPU.
 
 services:
   prayervault:
@@ -22,13 +27,16 @@ services:
     # Must be able to write PRAYERS_DIR; match the folder owner's uid:gid
     user: "${PUID:-1000}:${PGID:-1000}"
     restart: unless-stopped
+    depends_on:
+      - ollama
+      - whisper
     environment:
       - VAULT_DIR=/vault
       - AUTH_USERNAME=${AUTH_USERNAME:-sean}
       - AUTH_PASSWORD_HASH_B64=${AUTH_PASSWORD_HASH_B64:?run scripts/hash_password.py and use the B64 line}
       - SESSION_SECRET=${SESSION_SECRET:?generate with python -c "import secrets; print(secrets.token_hex(32))"}
-      - OLLAMA_URL=${OLLAMA_URL:?e.g. http://10.0.0.210:11434 - no /v1 suffix}
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.1:8b}
+      - OLLAMA_URL=${OLLAMA_URL:-http://ollama:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2:3b}
       - EMBED_MODEL=${EMBED_MODEL:-nomic-embed-text:latest}
       - WHISPER_URL=http://whisper:9000
       # false so login works over plain HTTP on the LAN; external traffic is
@@ -38,6 +46,38 @@ services:
       - "${LAN_PORT:-8800}:8000"
     volumes:
       - "${PRAYERS_DIR:?host folder where prayer notes are stored}:/vault"
+
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - ollama_models:/root/.ollama
+    # For NVIDIA GPU acceleration, install nvidia-container-toolkit on the host
+    # and uncomment:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: ["gpu"]
+
+  # One-shot: waits for ollama, then pulls the chat + embedding models into the
+  # shared volume. Exits when finished; safe to re-run (pull is a no-op if present).
+  ollama-pull:
+    image: ollama/ollama:latest
+    depends_on:
+      - ollama
+    restart: "no"
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >
+        until ollama list >/dev/null 2>&1; do echo "waiting for ollama..."; sleep 2; done;
+        ollama pull ${OLLAMA_MODEL:-llama3.2:3b};
+        ollama pull ${EMBED_MODEL:-nomic-embed-text:latest}
 
   whisper:
     image: onerahmet/openai-whisper-asr-webservice:latest
@@ -56,4 +96,5 @@ services:
       - TUNNEL_TOKEN=${TUNNEL_TOKEN:?create a tunnel in Cloudflare Zero Trust and paste its token}
 
 volumes:
+  ollama_models:
   whisper_cache:

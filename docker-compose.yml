@@ -3,8 +3,14 @@ services:
     build: .
     restart: unless-stopped
     env_file: .env
+    depends_on:
+      - ollama
     environment:
       - VAULT_DIR=/vault
+      # Talk to the bundled ollama container by default; override in .env to use
+      # a host or remote Ollama (e.g. http://host.docker.internal:11434).
+      - OLLAMA_URL=${OLLAMA_URL:-http://ollama:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2:3b}
     volumes:
       - "${PRAYERS_DIR}:/vault"
     extra_hosts:
@@ -12,6 +18,38 @@ services:
     # For LAN-only use without Caddy, uncomment and set COOKIE_SECURE=false in .env:
     # ports:
     #   - "8800:8000"
+
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - ollama_models:/root/.ollama
+    # For NVIDIA GPU acceleration, install nvidia-container-toolkit on the host
+    # and uncomment:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: ["gpu"]
+
+  # One-shot: waits for ollama, pulls the chat + embedding models, then exits.
+  # Safe to re-run — pulling an existing model is a no-op.
+  ollama-pull:
+    image: ollama/ollama:latest
+    depends_on:
+      - ollama
+    restart: "no"
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >
+        until ollama list >/dev/null 2>&1; do echo "waiting for ollama..."; sleep 2; done;
+        ollama pull ${OLLAMA_MODEL:-llama3.2:3b};
+        ollama pull ${EMBED_MODEL:-nomic-embed-text:latest}
 
   caddy:
     image: caddy:2
@@ -27,5 +65,6 @@ services:
       - caddy_config:/config
 
 volumes:
+  ollama_models:
   caddy_data:
   caddy_config:

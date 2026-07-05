@@ -1,8 +1,8 @@
 .env
+run.ps1
+vault/
 __pycache__/
 *.pyc
 .pytest_cache/
 caddy_data/
 caddy_config/
-run.ps1
-vault/
