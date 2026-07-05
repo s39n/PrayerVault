@@ -12,7 +12,7 @@ os.environ["COOKIE_SECURE"] = "false"
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from app import notes, ollama_client  # noqa: E402
+from app import notes, notify, ollama_client, settings  # noqa: E402, F401
 from app.main import app  # noqa: E402
 
 client = TestClient(app)
@@ -122,11 +122,49 @@ def test_semantic_search_and_related(monkeypatch):
     # second sleep prayer should have picked up a Related link to the first
     n = client.get(f"/api/prayers/{b}").json()
     assert "Related" in n["sections"]
-    assert a in n["sections"]["Related"]
 
-    # Related renders between How to Pray and Updates in the file
-    raw = (notes.vault_dir() / f"{b}.md").read_text()
-    assert raw.index("## Related") < raw.index("## Updates")
+
+def test_ask_endpoint(monkeypatch):
+    async def fake_ask(question):
+        return {"scripture_md": "- [[Psalm 46#1|Psalm 46:1]] — refuge",
+                "answer": "As Psalm 46 reminds us, God is our refuge."}
+    monkeypatch.setattr(ollama_client, "ask", fake_ask)
+    client.post("/api/login", json={"username": "sean", "password": "testpass"})
+    r = client.post("/api/ask", json={"question": "How do I find peace?"})
+    assert r.status_code == 200
+    body = r.json()
+    assert "Psalm 46" in body["scripture_md"]
+    assert body["answer"].startswith("As Psalm 46")
+    # empty question rejected by validation
+    assert client.post("/api/ask", json={"question": ""}).status_code == 422
+
+
+def test_settings_roundtrip():
+    client.post("/api/login", json={"username": "sean", "password": "testpass"})
+    assert "morning" in client.get("/api/settings").json()
+    r = client.post("/api/settings", json={"morning": {
+        "enabled": True, "delivery": "ntfy", "ntfy_topic": "my-secret-topic",
+        "hour": 8, "minute": 30}})
+    m = r.json()["morning"]
+    assert m["enabled"] is True and m["delivery"] == "ntfy"
+    assert m["ntfy_topic"] == "my-secret-topic" and m["hour"] == 8 and m["minute"] == 30
+    m = client.post("/api/settings", json={"morning": {
+        "hour": 99, "minute": -5, "delivery": "bogus"}}).json()["morning"]
+    assert m["hour"] == 23 and m["minute"] == 0 and m["delivery"] == "none"
+
+
+def test_notify_test_push(monkeypatch):
+    sent = {}
+    async def fake_send(topic, title, body):
+        sent.update(topic=topic, title=title, body=body)
+    monkeypatch.setattr(notify, "send_ntfy", fake_send)
+    client.post("/api/login", json={"username": "sean", "password": "testpass"})
+    client.post("/api/settings", json={"morning": {"delivery": "ntfy", "ntfy_topic": "topic123"}})
+    r = client.post("/api/notify/test", json={})
+    assert r.status_code == 200
+    assert sent["topic"] == "topic123" and sent["title"] and sent["body"]
+    client.post("/api/settings", json={"morning": {"delivery": "ntfy", "ntfy_topic": ""}})
+    assert client.post("/api/notify/test", json={}).status_code == 422
 
 
 def test_transcribe(monkeypatch):

@@ -12,13 +12,11 @@ function show(view) {
   if (pollTimer && view !== "detail-view") { clearInterval(pollTimer); pollTimer = null; }
 }
 
-// Highlight the active nav tab (today | prayers | fruit)
 function setNav(name) {
   document.querySelectorAll(".nav-item").forEach((b) =>
     b.classList.toggle("active", b.dataset.nav === name));
 }
 
-// The ongoing prayer that has waited longest for attention
 function longestWaiting(items) {
   const ongoing = items.filter((i) => i.status === "ongoing");
   return ongoing.length
@@ -46,7 +44,6 @@ function esc(s) {
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
-// Minimal renderer for the markdown we generate (bold, wikilinks, list items, paragraphs)
 function md(s) {
   let h = esc(s);
   h = h.replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, '<span class="scripture-ref">$2</span>');
@@ -92,7 +89,6 @@ async function renderList() {
       <div class="meta">${esc(i.date)}${i.requested_by ? " · for " + esc(i.requested_by) : ""}</div>
       <div class="meta" style="margin-top:6px">${esc(i.preview)}${i.preview.length >= 160 ? "…" : ""}</div>
     </div>`).join("");
-  // Featured "a word is needed" \u2014 the ongoing prayer that has waited longest for attention
   const featured = longestWaiting(items);
   const heroHtml = (featured && filterStatus !== "answered") ? `
     <div class="hero" data-id="${esc(featured.id)}">
@@ -103,7 +99,7 @@ async function renderList() {
     </div>` : "";
   $("list-view").innerHTML =
     heroHtml +
-    `<input id="search-box" placeholder="Search prayers by meaning\u2026 (press Enter)" style="margin-bottom:12px">` +
+    `<input id="search-box" placeholder="Search prayers by meaning… (press Enter)" style="margin-bottom:12px">` +
     `<div class="row" style="margin-bottom:14px">${chips}</div>` +
     (rows || `<p class="meta">No ${filterStatus === "all" ? "" : filterStatus + " "}prayers yet.</p>`);
   const hero = $("list-view").querySelector(".hero");
@@ -130,12 +126,12 @@ async function renderSearch(q) {
         <span><span class="badge">${Math.round(i.score * 100)}% match</span>
         <span class="badge ${i.status}">${esc(i.status)}</span></span>
       </div>
-      <div class="meta">${esc(i.date)}${i.requested_by ? " \u00b7 for " + esc(i.requested_by) : ""}</div>
+      <div class="meta">${esc(i.date)}${i.requested_by ? " · for " + esc(i.requested_by) : ""}</div>
       <div class="meta" style="margin-top:6px">${esc(i.preview)}</div>
     </div>`).join("");
   $("list-view").innerHTML =
     `<button class="link" id="btn-back3">&larr; All prayers</button>
-     <p class="meta">Results for \u201c${esc(q)}\u201d</p>` +
+     <p class="meta">Results for “${esc(q)}”</p>` +
     (rows || `<p class="meta">Nothing similar found.</p>`);
   $("btn-back3").addEventListener("click", renderList);
   $("list-view").querySelectorAll(".card").forEach((c) =>
@@ -143,7 +139,6 @@ async function renderSearch(q) {
 }
 
 // ---------- Today ----------
-// Curated, offline verse-of-the-day list (Reformed-friendly). No external calls.
 const VERSES = [
   ["The Lord is my shepherd; I shall not want.", "Psalm 23:1"],
   ["Cast all your anxieties on him, because he cares for you.", "1 Peter 5:7"],
@@ -192,7 +187,6 @@ async function renderToday() {
   const featured = longestWaiting(items);
   const answered = items.filter((i) => i.status === "answered");
   const today = new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
-
   const heroHtml = featured ? `
     <div class="hero" data-id="${esc(featured.id)}">
       <div class="eyebrow">A word is needed</div>
@@ -205,7 +199,6 @@ async function renderToday() {
       ? `<div class="next-step">No prayers are waiting on you today. Visit <strong>Fruit</strong> to remember how God has answered.</div>`
       : `<div class="next-step">Nothing is on your heart here yet. When you're ready, bring a matter into the light.</div>
          <div class="row" style="justify-content:center"><button class="primary" id="today-new">+ Bring a matter</button></div>`);
-
   $("today-view").innerHTML = `
     <div class="greeting">
       <span class="eyebrow">${esc(today)}</span>
@@ -217,7 +210,6 @@ async function renderToday() {
       <div class="verse-ref">${esc(ref)}</div>
     </div>
     ${heroHtml}`;
-
   const hero = $("today-view").querySelector(".hero");
   if (hero) hero.addEventListener("click", () => renderDetail(hero.dataset.id));
   const tn = $("today-new");
@@ -336,7 +328,6 @@ async function renderYou() {
         <span id="mp-status" class="meta"></span>
       </div>
     </div>`;
-
   const gather = () => ({ morning: {
     enabled: $("mp-enabled").checked,
     delivery: $("mp-delivery").value,
@@ -344,21 +335,16 @@ async function renderYou() {
     hour: parseInt($("mp-hour").value, 10),
     minute: parseInt($("mp-min").value, 10),
   }});
-
   $("mp-save").addEventListener("click", async () => {
-    $("mp-error").textContent = "";
-    $("mp-status").textContent = "";
+    $("mp-error").textContent = ""; $("mp-status").textContent = "";
     try {
       await api("/api/settings", { method: "POST", body: JSON.stringify(gather()) });
       $("mp-status").textContent = "Saved.";
     } catch (e) { $("mp-error").textContent = e.message; }
   });
-
   $("mp-test").addEventListener("click", async () => {
-    $("mp-error").textContent = "";
-    $("mp-status").textContent = "";
-    const btn = $("mp-test");
-    btn.disabled = true;
+    $("mp-error").textContent = ""; $("mp-status").textContent = "";
+    const btn = $("mp-test"); btn.disabled = true;
     try {
       await api("/api/settings", { method: "POST", body: JSON.stringify(gather()) });
       await api("/api/notify/test", { method: "POST", body: JSON.stringify({}) });
@@ -467,7 +453,7 @@ function renderNew() {
   micBtn.addEventListener("click", async () => {
     if (rec && rec.state === "recording") { rec.stop(); return; }
     if (!navigator.mediaDevices?.getUserMedia) {
-      $("np-error").textContent = "Microphone needs a secure connection \u2014 use the https:// address.";
+      $("np-error").textContent = "Microphone needs a secure connection — use the https:// address.";
       return;
     }
     try {
@@ -478,7 +464,7 @@ function renderNew() {
       rec.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop());
         micBtn.disabled = true;
-        micBtn.innerHTML = '<span class="spinner"></span> Transcribing\u2026';
+        micBtn.innerHTML = '<span class="spinner"></span> Transcribing…';
         try {
           const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
           const fd = new FormData();
@@ -497,7 +483,6 @@ function renderNew() {
       $("np-error").textContent = "";
     } catch (e) { $("np-error").textContent = "Microphone access denied: " + e.message; }
   });
-
   $("np-save").addEventListener("click", async () => {
     try {
       const res = await api("/api/prayers", { method: "POST", body: JSON.stringify({
