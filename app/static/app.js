@@ -562,3 +562,8 @@ document.querySelectorAll(".nav-item").forEach((b) =>
   }));
 
 api("/api/me").then(renderToday).catch(() => show("login-view"));
+
+// ---- PWA: install support ----
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js").catch(() => {});
+}

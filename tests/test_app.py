@@ -202,3 +202,18 @@ def test_prompt_settings():
     assert ollama_client._prompt("answer", "DEFAULT") == "DEFAULT"
     # morning settings survive a prompts-only save
     assert "morning" in r.json()
+
+
+def test_pwa_assets_public():
+    """PWA assets must be served without auth so the app can install."""
+    for path, ctype in [
+        ("/manifest.webmanifest", "application/manifest+json"),
+        ("/sw.js", "application/javascript"),
+        ("/favicon.ico", "image/x-icon"),
+        ("/icon-192.png", "image/png"),
+        ("/veil-left.svg", "image/svg+xml"),
+    ]:
+        r = client.get(path)
+        assert r.status_code == 200, path
+        assert r.headers["content-type"].startswith(ctype), path
+    assert client.get("/not-a-real-asset").status_code == 404

@@ -267,3 +267,29 @@ async def index():
 async def appjs():
     return FileResponse(STATIC / "app.js", media_type="application/javascript",
                         headers=NO_CACHE)
+
+
+DAY_CACHE = {"Cache-Control": "public, max-age=86400"}
+
+# Root-level static assets (PWA + icons + veil art). Whitelist keeps
+# _safe_path-style guarantees: only these exact names are ever served.
+ASSETS = {
+    "manifest.webmanifest": ("application/manifest+json", NO_CACHE),
+    "sw.js": ("application/javascript", NO_CACHE),
+    "favicon.ico": ("image/x-icon", DAY_CACHE),
+    "icon.svg": ("image/svg+xml", DAY_CACHE),
+    "veil-left.svg": ("image/svg+xml", DAY_CACHE),
+    "veil-right.svg": ("image/svg+xml", DAY_CACHE),
+    "icon-192.png": ("image/png", DAY_CACHE),
+    "icon-512.png": ("image/png", DAY_CACHE),
+    "icon-maskable-512.png": ("image/png", DAY_CACHE),
+    "apple-touch-icon.png": ("image/png", DAY_CACHE),
+}
+
+
+@app.get("/{asset}")
+async def static_asset(asset: str):
+    if asset not in ASSETS:
+        raise HTTPException(404, "Not found")
+    media_type, headers = ASSETS[asset]
+    return FileResponse(STATIC / asset, media_type=media_type, headers=headers)

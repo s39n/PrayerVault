@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f7f1e3"/>
+      <stop offset="1" stop-color="#ece2cc"/>
+    </linearGradient>
+    <linearGradient id="arch" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#54654f"/>
+      <stop offset="1" stop-color="#3c4936"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d3a852"/>
+      <stop offset="1" stop-color="#a9843c"/>
+    </linearGradient>
+    <linearGradient id="curtainL" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#5d1414"/>
+      <stop offset="0.45" stop-color="#8a2222"/>
+      <stop offset="0.75" stop-color="#701a1a"/>
+      <stop offset="1" stop-color="#4a0f0f"/>
+    </linearGradient>
+    <linearGradient id="curtainR" x1="1" y1="0" x2="0" y2="0">
+      <stop offset="0" stop-color="#5d1414"/>
+      <stop offset="0.45" stop-color="#8a2222"/>
+      <stop offset="0.75" stop-color="#701a1a"/>
+      <stop offset="1" stop-color="#4a0f0f"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <!-- arch frame -->
+  <path d="M120,436 V216 A136,136 0 0 1 392,216 V436 Z" fill="#e0d5bb"/>
+  <!-- arch interior -->
+  <path d="M140,436 V218 A116,116 0 0 1 372,218 V436 Z" fill="url(#arch)"/>
+  <!-- cross -->
+  <g fill="url(#gold)">
+    <rect x="240" y="228" width="32" height="180" rx="4"/>
+    <rect x="196" y="276" width="120" height="32" rx="4"/>
+  </g>
+  <!-- torn curtains pulled to the sides -->
+  <path d="M140,218 A116,116 0 0 1 224,126 C204,164 214,202 198,244 C210,280 194,316 204,352 C192,388 202,414 194,436 L140,436 Z" fill="url(#curtainL)"/>
+  <path d="M372,218 A116,116 0 0 0 288,126 C308,164 298,202 314,244 C302,280 318,316 308,352 C320,388 310,414 318,436 L372,436 Z" fill="url(#curtainR)"/>
+  <!-- curtain fold lines -->
+  <g stroke="#3f0d0d" stroke-width="6" fill="none" opacity="0.55" stroke-linecap="round">
+    <path d="M172,196 C190,270 178,340 188,428"/>
+    <path d="M340,196 C322,270 334,340 324,428"/>
+  </g>
+  <!-- base step -->
+  <rect x="104" y="436" width="304" height="26" rx="6" fill="#c9bb9a"/>
+</svg>

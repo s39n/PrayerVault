@@ -13,6 +13,8 @@ Track requests over time and mark them answered.
 - **AI**: Ollama on the host machine (`host.docker.internal:11434`)
 - **Auth**: bcrypt login, signed HttpOnly session cookies, login rate limiting,
   security headers, Caddy for automatic HTTPS
+- **PWA**: installable on mobile and desktop (manifest + service worker); the app
+  shell is cached for offline startup, prayer data always loads live
 
 ## Setup
 
@@ -22,6 +24,12 @@ Track requests over time and mark them answered.
 4. Set `PRAYERS_DIR` to the vault folder prayers should live in.
 5. Set `OLLAMA_MODEL` to a model you have pulled (`ollama list`).
 6. `docker compose up -d --build`
+
+### Install as an app
+
+PrayerVault is a PWA. On desktop Chrome/Edge, use the install icon in the address
+bar. On Android, Chrome menu → *Add to Home screen* → *Install*. On iOS, Safari
+share sheet → *Add to Home Screen*. (Requires HTTPS unless on `localhost`.)
 
 ### Exposure options
 
