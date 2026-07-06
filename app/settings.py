@@ -9,6 +9,7 @@ DEFAULTS = {
         "enabled": False,
         "delivery": "ntfy",   # "ntfy" | "none"
         "ntfy_topic": "",
+        "ntfy_server": "",
         "hour": 8,
         "minute": 0,
     },
@@ -50,7 +51,8 @@ def save(data: dict) -> dict:
     m = {**cur["morning"], **(data.get("morning") or {})}
     m["enabled"] = bool(m.get("enabled"))
     m["delivery"] = m.get("delivery") if m.get("delivery") in ("ntfy", "none") else "none"
-    m["ntfy_topic"] = str(m.get("ntfy_topic", "")).strip()[:100]
+    m["ntfy_topic"] = str(m.get("ntfy_topic", "")).strip()[:200]
+    m["ntfy_server"] = str(m.get("ntfy_server", "")).strip()[:200]
     m["hour"] = _clamp(m.get("hour"), 0, 23, 8)
     m["minute"] = _clamp(m.get("minute"), 0, 59, 0)
     p = {**cur["prompts"], **(data.get("prompts") or {})}

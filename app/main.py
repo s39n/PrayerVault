@@ -224,7 +224,7 @@ async def notify_test(user: str = Depends(auth.require_auth)):
         raise HTTPException(422, "Choose ntfy delivery and set a topic first.")
     try:
         title, body = notify.compose_morning()
-        await notify.send_ntfy(m["ntfy_topic"], title, body)
+        await notify.send_ntfy(m.get("ntfy_server", ""), m["ntfy_topic"], title, body)
     except Exception as e:
         raise HTTPException(503, f"Push failed: {e}")
     return {"ok": True}

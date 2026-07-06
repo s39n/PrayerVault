@@ -316,9 +316,11 @@ async function renderYou() {
         <option value="ntfy" ${m.delivery === "ntfy" ? "selected" : ""}>ntfy push notification</option>
         <option value="none" ${m.delivery === "none" ? "selected" : ""}>In-app only (no push)</option>
       </select>
+      <label>ntfy server URL</label>
+      <input id="mp-server" value="${esc(m.ntfy_server || s.ntfy_server || "")}" placeholder="https://ntfy.salife.us">
       <label>ntfy topic</label>
-      <input id="mp-topic" value="${esc(m.ntfy_topic)}" placeholder="e.g. sean-prayer-7fq3k9">
-      <p class="meta">Install the ntfy app and subscribe to this exact topic on ${esc(s.ntfy_server)}. Choose something private and hard to guess — anyone who knows the topic can read it.</p>
+      <input id="mp-topic" value="${esc(m.ntfy_topic)}" placeholder="e.g. prayervault">
+      <p class="meta">Set your server and a topic (e.g. prayervault). You can also paste a full URL like https://ntfy.salife.us/prayervault into the topic box. Subscribe to the same topic in the ntfy app — anyone who knows it can read it, so keep it private.</p>
       <label>Time</label>
       <div class="row">
         <select id="mp-hour" style="width:auto">${opts(24, m.hour)}</select>
@@ -349,6 +351,7 @@ async function renderYou() {
   const gather = () => ({ morning: {
     enabled: $("mp-enabled").checked,
     delivery: $("mp-delivery").value,
+    ntfy_server: $("mp-server").value.trim(),
     ntfy_topic: $("mp-topic").value.trim(),
     hour: parseInt($("mp-hour").value, 10),
     minute: parseInt($("mp-min").value, 10),

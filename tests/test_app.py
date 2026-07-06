@@ -155,14 +155,17 @@ def test_settings_roundtrip():
 
 def test_notify_test_push(monkeypatch):
     sent = {}
-    async def fake_send(topic, title, body):
-        sent.update(topic=topic, title=title, body=body)
+    async def fake_send(server, topic, title, body):
+        sent.update(server=server, topic=topic, title=title, body=body)
     monkeypatch.setattr(notify, "send_ntfy", fake_send)
     client.post("/api/login", json={"username": "sean", "password": "testpass"})
-    client.post("/api/settings", json={"morning": {"delivery": "ntfy", "ntfy_topic": "topic123"}})
+    client.post("/api/settings", json={"morning": {"delivery": "ntfy", "ntfy_topic": "topic123", "ntfy_server": "https://ntfy.salife.us"}})
     r = client.post("/api/notify/test", json={})
     assert r.status_code == 200
-    assert sent["topic"] == "topic123" and sent["title"] and sent["body"]
+    assert sent["topic"] == "topic123" and sent["server"] == "https://ntfy.salife.us" and sent["title"] and sent["body"]
+    from app import notify as _n
+    assert _n.ntfy_url("https://ntfy.salife.us", "prayervault") == "https://ntfy.salife.us/prayervault"
+    assert _n.ntfy_url("https://ntfy.salife.us", "https://x.example/full") == "https://x.example/full"
     client.post("/api/settings", json={"morning": {"delivery": "ntfy", "ntfy_topic": ""}})
     assert client.post("/api/notify/test", json={}).status_code == 422
 

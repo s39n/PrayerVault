@@ -51,8 +51,17 @@ def compose_morning() -> tuple[str, str]:
     return title, body
 
 
-async def send_ntfy(topic: str, title: str, body: str) -> None:
-    url = f"{config.NTFY_SERVER.rstrip('/')}/{topic}"
+def ntfy_url(server: str, topic: str) -> str:
+    """Build the publish URL. A full http(s) URL in `topic` is used as-is."""
+    topic = (topic or "").strip()
+    if topic.startswith("http://") or topic.startswith("https://"):
+        return topic.rstrip("/")
+    base = (server or config.NTFY_SERVER).rstrip("/")
+    return f"{base}/{topic.lstrip('/')}"
+
+
+async def send_ntfy(server: str, topic: str, title: str, body: str) -> None:
+    url = ntfy_url(server, topic)
     async with httpx.AsyncClient(timeout=10) as client:
         r = await client.post(
             url,
@@ -67,6 +76,6 @@ async def send_morning(cfg: dict | None = None) -> bool:
     m = (cfg or settings.load())["morning"]
     if m.get("delivery") == "ntfy" and m.get("ntfy_topic"):
         title, body = compose_morning()
-        await send_ntfy(m["ntfy_topic"], title, body)
+        await send_ntfy(m.get("ntfy_server", ""), m["ntfy_topic"], title, body)
         return True
     return False
