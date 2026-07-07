@@ -140,6 +140,7 @@ async function renderSearch(q) {
 
 // ---------- Today ----------
 const VERSES = [
+  ["Cast your burden on the Lord, and he will sustain you.", "Psalm 55:22"],
   ["The Lord is my shepherd; I shall not want.", "Psalm 23:1"],
   ["Cast all your anxieties on him, because he cares for you.", "1 Peter 5:7"],
   ["Be still, and know that I am God.", "Psalm 46:10"],
@@ -172,6 +173,34 @@ function verseOfDay() {
   return VERSES[day % VERSES.length];
 }
 
+// Gently rotate the displayed verse wherever one is visible (login card, Today).
+let verseIdx = Math.floor(Math.random() * VERSES.length);
+
+function fadeSwap(els, apply) {
+  els.forEach((e) => { e.style.opacity = "0"; });
+  setTimeout(() => { apply(); els.forEach((e) => { e.style.opacity = "1"; }); }, 600);
+}
+
+setInterval(() => {
+  const loginVisible = !$("login-view").classList.contains("hidden");
+  const todayText = document.querySelector("#today-view .verse-text");
+  const todayVisible = todayText && !$("today-view").classList.contains("hidden");
+  if (!loginVisible && !todayVisible) return;
+  verseIdx = (verseIdx + 1) % VERSES.length;
+  const [text, ref] = VERSES[verseIdx];
+  if (loginVisible) {
+    const lv = $("login-verse");
+    if (lv) fadeSwap([lv], () => { lv.textContent = `“${text}” — ${ref}`; });
+  }
+  if (todayVisible) {
+    const tr = document.querySelector("#today-view .verse-ref");
+    fadeSwap([todayText, tr], () => {
+      todayText.textContent = `“${text}”`;
+      if (tr) tr.textContent = ref;
+    });
+  }
+}, 10000);
+
 function greeting() {
   const h = new Date().getHours();
   if (h < 12) return "Good morning";
@@ -183,6 +212,12 @@ async function renderToday() {
   show("today-view");
   setNav("today");
   const items = await api("/api/prayers");
+  let first = "friend";
+  try {
+    const me = await api("/api/me");
+    first = (me.name || me.user || "friend").split(" ")[0];
+    first = first.charAt(0).toUpperCase() + first.slice(1);
+  } catch (e) { /* greeting only */ }
   const [text, ref] = verseOfDay();
   const featured = longestWaiting(items);
   const answered = items.filter((i) => i.status === "answered");
@@ -202,7 +237,7 @@ async function renderToday() {
   $("today-view").innerHTML = `
     <div class="greeting">
       <span class="eyebrow">${esc(today)}</span>
-      <h2>${greeting()}, Sean.</h2>
+      <h2>${greeting()}, ${esc(first)}.</h2>
     </div>
     <div class="verse-card">
       <div class="eyebrow">A word for today</div>

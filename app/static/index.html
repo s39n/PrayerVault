@@ -74,6 +74,8 @@ blockquote{border-left:3px solid var(--gold);margin:8px 0;padding:2px 14px;color
 ul{padding-left:22px}
 .verse-quote{white-space:pre-wrap}
 nav#nav{display:flex;gap:8px;justify-content:center;padding:4px 20px 2px;flex-wrap:wrap}
+nav#nav.hidden{display:none}
+#login-verse,.verse-text,.verse-ref{transition:opacity .6s ease}
 .nav-item{border:none;background:none;color:var(--muted);border-radius:0;padding:6px 14px 10px;font-size:.95rem;letter-spacing:.5px;border-bottom:2px solid transparent}
 .nav-item:hover{color:var(--accent-dark);border-color:var(--line)}
 .nav-item.active{color:var(--accent-dark);border-color:var(--gold)}
@@ -122,7 +124,7 @@ header,nav#nav,main{position:relative;z-index:1}
 <main>
   <div id="login-view" class="card hidden">
     <h2 style="margin-top:0;font-weight:normal">Sign in</h2>
-    <p class="meta" style="margin-top:-8px">“Cast your burden on the Lord, and he will sustain you.” — Ps 55:22</p>
+    <p class="meta" id="login-verse" style="margin-top:-8px">“Cast your burden on the Lord, and he will sustain you.” — Psalm 55:22</p>
     <label>Username</label><input id="login-user" autocomplete="username">
     <label>Password</label><input id="login-pass" type="password" autocomplete="current-password">
     <div class="error-msg" id="login-error"></div>
