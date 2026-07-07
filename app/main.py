@@ -116,10 +116,10 @@ async def google_callback(code: str = "", state: str = "", error: str = ""):
         try:
             tokens = await google_auth.exchange_code(code)
             info = await google_auth.verify_id_token(tokens["id_token"])
+            users.save_profile(info["sub"], info.get("email", ""), info.get("name", ""))
         except Exception:
             log.exception("Google login failed")
             return _html_redirect("/?login=failed")
-        users.save_profile(info["sub"], info.get("email", ""), info.get("name", ""))
         resp = _html_redirect("/")
         resp.set_cookie(
             "session", auth.create_session_token(f"g:{info['sub']}"),

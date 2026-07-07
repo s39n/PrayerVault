@@ -30,6 +30,7 @@ services:
     depends_on:
       - ollama
       - whisper
+      - users-init
     environment:
       - VAULT_DIR=/vault
       - AUTH_USERNAME=${AUTH_USERNAME:-sean}
@@ -55,6 +56,15 @@ services:
       - "${PRAYERS_DIR:?host folder where prayer notes are stored}:/vault"
       # Google users' journals. Set USERS_DIR_HOST to a host folder to make
       # them easy to find/back up; defaults to a named docker volume.
+      - "${USERS_DIR_HOST:-user_journals}:/users"
+
+  # One-shot: the app runs as PUID:PGID but docker creates the users volume as
+  # root — this hands ownership to the app user so Google signups can write.
+  users-init:
+    image: busybox
+    restart: "no"
+    command: sh -c "chown ${PUID:-1000}:${PGID:-1000} /users"
+    volumes:
       - "${USERS_DIR_HOST:-user_journals}:/users"
 
   ollama:
