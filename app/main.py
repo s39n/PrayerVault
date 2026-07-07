@@ -373,6 +373,8 @@ DAY_CACHE = {"Cache-Control": "public, max-age=86400"}
 # _safe_path-style guarantees: only these exact names are ever served.
 ASSETS = {
     "manifest.webmanifest": ("application/manifest+json", NO_CACHE),
+    "privacy.html": ("text/html", NO_CACHE),
+    "terms.html": ("text/html", NO_CACHE),
     "sw.js": ("application/javascript", NO_CACHE),
     "favicon.ico": ("image/x-icon", DAY_CACHE),
     "icon.svg": ("image/svg+xml", DAY_CACHE),
