@@ -43,10 +43,19 @@ services:
       # false so login works over plain HTTP on the LAN; external traffic is
       # HTTPS via Cloudflare regardless.
       - COOKIE_SECURE=${COOKIE_SECURE:-false}
+      # Google sign-in + Drive backup (optional; features hidden when unset).
+      # Redirect URI in Google Cloud Console: ${PUBLIC_URL}/api/auth/google/callback
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - PUBLIC_URL=${PUBLIC_URL:-https://${DOMAIN:-}}
+      - USERS_DIR=/users
     ports:
       - "${LAN_PORT:-8800}:8000"
     volumes:
       - "${PRAYERS_DIR:?host folder where prayer notes are stored}:/vault"
+      # Google users' journals. Set USERS_DIR_HOST to a host folder to make
+      # them easy to find/back up; defaults to a named docker volume.
+      - "${USERS_DIR_HOST:-user_journals}:/users"
 
   ollama:
     image: ollama/ollama:latest
@@ -99,3 +108,4 @@ services:
 volumes:
   ollama_models:
   whisper_cache:
+  user_journals:
