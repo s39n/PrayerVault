@@ -185,3 +185,8 @@ uvicorn app.main:app --reload
 
 Pushes to `master` build and publish `ghcr.io/s39n/prayervault:latest` via
 GitHub Actions (tests must pass first).
+
+## Support
+
+If PrayerVault blesses you, you can
+[buy me a coffee](https://buymeacoffee.com/seanseanric). ☕
