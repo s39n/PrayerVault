@@ -11,8 +11,8 @@ SECTION_ORDER = ["Prayer", "Scripture", "Reflection", "How to Pray", "Related", 
 ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 _\-',]*$")
 
 
-def vault_dir() -> Path:
-    d = Path(config.VAULT_DIR)
+def vault_dir(root: Path | str | None = None) -> Path:
+    d = Path(root) if root else Path(config.VAULT_DIR)
     d.mkdir(parents=True, exist_ok=True)
     return d
 
@@ -23,11 +23,12 @@ def slugify(title: str) -> str:
     return s[:80] or "Prayer"
 
 
-def _safe_path(note_id: str) -> Path:
+def _safe_path(note_id: str, root: Path | str | None = None) -> Path:
     if not ID_RE.match(note_id):
         raise ValueError("Invalid note id")
-    p = (vault_dir() / f"{note_id}.md").resolve()
-    if p.parent != vault_dir().resolve():
+    base = vault_dir(root)
+    p = (base / f"{note_id}.md").resolve()
+    if p.parent != base.resolve():
         raise ValueError("Invalid note id")
     return p
 
@@ -70,15 +71,16 @@ def render_note(fm: dict, sections: dict[str, str]) -> str:
     return "\n".join(parts)
 
 
-def create_note(kind: str, title: str, text: str, requested_by: str = "") -> str:
+def create_note(kind: str, title: str, text: str, requested_by: str = "",
+                root: Path | str | None = None) -> str:
     today = datetime.date.today().isoformat()
     slug = slugify(title)
     note_id = f"{today} {slug}"
-    path = _safe_path(note_id)
+    path = _safe_path(note_id, root)
     n = 2
     while path.exists():
         note_id = f"{today} {slug} {n}"
-        path = _safe_path(note_id)
+        path = _safe_path(note_id, root)
         n += 1
     fm = {
         "title": slug,
@@ -98,21 +100,22 @@ def create_note(kind: str, title: str, text: str, requested_by: str = "") -> str
     return note_id
 
 
-def read_note(note_id: str) -> dict:
-    path = _safe_path(note_id)
+def read_note(note_id: str, root: Path | str | None = None) -> dict:
+    path = _safe_path(note_id, root)
     if not path.exists():
         raise FileNotFoundError(note_id)
     fm, sections = parse_note(path.read_text(encoding="utf-8"))
     return {"id": note_id, "frontmatter": fm, "sections": sections}
 
 
-def write_note(note_id: str, fm: dict, sections: dict[str, str]) -> None:
-    _safe_path(note_id).write_text(render_note(fm, sections), encoding="utf-8")
+def write_note(note_id: str, fm: dict, sections: dict[str, str],
+               root: Path | str | None = None) -> None:
+    _safe_path(note_id, root).write_text(render_note(fm, sections), encoding="utf-8")
 
 
-def list_notes() -> list[dict]:
+def list_notes(root: Path | str | None = None) -> list[dict]:
     out = []
-    for p in sorted(vault_dir().glob("*.md"), reverse=True):
+    for p in sorted(vault_dir(root).glob("*.md"), reverse=True):
         try:
             fm, sections = parse_note(p.read_text(encoding="utf-8"))
         except Exception:
@@ -133,16 +136,17 @@ def list_notes() -> list[dict]:
     return out
 
 
-def add_update(note_id: str, text: str) -> None:
-    note = read_note(note_id)
+def add_update(note_id: str, text: str, root: Path | str | None = None) -> None:
+    note = read_note(note_id, root)
     today = datetime.date.today().isoformat()
     updates = note["sections"].get("Updates", "")
     note["sections"]["Updates"] = (updates + f"\n- {today} — {text.strip()}").strip()
-    write_note(note_id, note["frontmatter"], note["sections"])
+    write_note(note_id, note["frontmatter"], note["sections"], root)
 
 
-def set_status(note_id: str, status: str, note_text: str = "") -> None:
-    note = read_note(note_id)
+def set_status(note_id: str, status: str, note_text: str = "",
+               root: Path | str | None = None) -> None:
+    note = read_note(note_id, root)
     note["frontmatter"]["status"] = status
     today = datetime.date.today().isoformat()
     if status == "answered":
@@ -153,18 +157,19 @@ def set_status(note_id: str, status: str, note_text: str = "") -> None:
         msg = "Reopened" + (f" — {note_text.strip()}" if note_text.strip() else "")
     updates = note["sections"].get("Updates", "")
     note["sections"]["Updates"] = (updates + f"\n- {today} — {msg}").strip()
-    write_note(note_id, note["frontmatter"], note["sections"])
+    write_note(note_id, note["frontmatter"], note["sections"], root)
 
 
-def apply_ai_result(note_id: str, result: dict | None, error: str = "") -> None:
-    note = read_note(note_id)
+def apply_ai_result(note_id: str, result: dict | None, error: str = "",
+                    root: Path | str | None = None) -> None:
+    note = read_note(note_id, root)
     fm, sections = note["frontmatter"], note["sections"]
     if error or not result:
         fm["ai"] = "error"
-        write_note(note_id, fm, sections)
+        write_note(note_id, fm, sections, root)
         return
     fm["ai"] = "done"
     sections["Scripture"] = result.get("scripture_md", "")
     sections["Reflection"] = result.get("reflection", "")
     sections["How to Pray"] = result.get("prompts_md", "")
-    write_note(note_id, fm, sections)
+    write_note(note_id, fm, sections, root)

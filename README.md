@@ -41,6 +41,25 @@ share sheet → *Add to Home Screen*. (Requires HTTPS unless on `localhost`.)
   internet — prayer data is sensitive, and a tailnet removes the public attack
   surface entirely while still working from your phone anywhere.
 
+## Sharing with others (Google sign-in)
+
+PrayerVault stays single-admin: your prayers live in your Obsidian vault and
+password login keeps working. Optionally, you can let others use the app with
+their Google account — each Google user gets their own private folder under
+`USERS_DIR` (never your vault), the same AI features (rate-limited to 30
+AI calls/hour per user), and backup tools. Everyone (you included) gets a
+**Download .zip** button, plus **Back up to Google Drive** which uploads a zip
+to the user's own Drive using the `drive.file` scope (the app can only see
+files it created).
+
+To enable it, create an OAuth client in Google Cloud Console (steps in
+`.env.example`), set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`, make sure
+`PUBLIC_URL` (or `DOMAIN`) matches your registered redirect URI, and restart.
+Leave the variables unset and every Google feature stays hidden.
+
+Admin-only areas: the You tab's morning prompt and AI prompt settings. Google
+users see an account card and backups there instead.
+
 ## Note format
 
 ```markdown

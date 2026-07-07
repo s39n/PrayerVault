@@ -13,19 +13,19 @@ RELATED_THRESHOLD = 0.55
 RELATED_MAX = 3
 
 
-def _index_path() -> Path:
-    return notes.vault_dir() / INDEX_FILE
+def _index_path(root: Path | str | None = None) -> Path:
+    return notes.vault_dir(root) / INDEX_FILE
 
 
-def _load() -> dict:
+def _load(root: Path | str | None = None) -> dict:
     try:
-        return json.loads(_index_path().read_text(encoding="utf-8"))
+        return json.loads(_index_path(root).read_text(encoding="utf-8"))
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
 
 
-def _save(index: dict) -> None:
-    _index_path().write_text(json.dumps(index), encoding="utf-8")
+def _save(index: dict, root: Path | str | None = None) -> None:
+    _index_path(root).write_text(json.dumps(index), encoding="utf-8")
 
 
 def _note_text(note: dict) -> str:
@@ -54,15 +54,15 @@ def _cos(a: list[float], b: list[float]) -> float:
     return dot / (na * nb) if na and nb else 0.0
 
 
-async def ensure_index() -> dict:
+async def ensure_index(root: Path | str | None = None) -> dict:
     """Embed new/changed prayers, drop deleted ones. Returns {id: {hash, vec}}."""
-    index = _load()
+    index = _load(root)
     seen = set()
     changed = False
-    for meta in notes.list_notes():
+    for meta in notes.list_notes(root):
         nid = meta["id"]
         seen.add(nid)
-        note = notes.read_note(nid)
+        note = notes.read_note(nid, root)
         text = _note_text(note)
         h = _hash(text)
         if index.get(nid, {}).get("hash") != h:
@@ -73,28 +73,29 @@ async def ensure_index() -> dict:
             del index[nid]
             changed = True
     if changed:
-        _save(index)
+        _save(index, root)
     return index
 
 
-async def search(query: str, limit: int = 10) -> list[dict]:
-    index = await ensure_index()
+async def search(query: str, limit: int = 10,
+                 root: Path | str | None = None) -> list[dict]:
+    index = await ensure_index(root)
     qv = await _embed(query, is_query=True)
     scored = sorted(((_cos(qv, e["vec"]), nid) for nid, e in index.items()), reverse=True)
-    metas = {m["id"]: m for m in notes.list_notes()}
+    metas = {m["id"]: m for m in notes.list_notes(root)}
     return [{**metas[nid], "score": round(s, 3)}
             for s, nid in scored[:limit] if nid in metas]
 
 
-async def add_related_section(note_id: str) -> None:
+async def add_related_section(note_id: str, root: Path | str | None = None) -> None:
     """Write a Related section with wikilinks to the most similar prayers."""
-    index = await ensure_index()
+    index = await ensure_index(root)
     if note_id not in index:
         return
     vec = index[note_id]["vec"]
     scored = sorted(((_cos(vec, e["vec"]), nid) for nid, e in index.items()
                      if nid != note_id), reverse=True)
-    metas = {m["id"]: m for m in notes.list_notes()}
+    metas = {m["id"]: m for m in notes.list_notes(root)}
     links = []
     for s, nid in scored[:RELATED_MAX]:
         if s < RELATED_THRESHOLD or nid not in metas:
@@ -102,6 +103,6 @@ async def add_related_section(note_id: str) -> None:
         links.append(f"- [[{nid}|{metas[nid]['title']}]]")
     if not links:
         return
-    note = notes.read_note(note_id)
+    note = notes.read_note(note_id, root)
     note["sections"]["Related"] = "\n".join(links)
-    notes.write_note(note_id, note["frontmatter"], note["sections"])
+    notes.write_note(note_id, note["frontmatter"], note["sections"], root)

@@ -217,3 +217,62 @@ def test_pwa_assets_public():
         assert r.status_code == 200, path
         assert r.headers["content-type"].startswith(ctype), path
     assert client.get("/not-a-real-asset").status_code == 404
+
+
+def _login():
+    client.cookies.clear()
+    r = client.post("/api/login", json={"username": "sean", "password": "testpass"})
+    assert r.status_code == 200
+
+
+def test_google_routes_hidden_when_unconfigured():
+    assert client.get("/api/app-config").json() == {"google_login": False}
+    assert client.get("/api/auth/google/login").status_code == 404
+    _login()
+    assert client.get("/api/backup/drive", follow_redirects=False).status_code == 404
+
+
+def test_per_user_isolation_and_admin_gate(monkeypatch):
+    from app import auth as auth_mod
+
+    async def fake_generate(*a, **k):
+        return None
+    monkeypatch.setattr(ollama_client, "generate", fake_generate)
+
+    _login()
+    client.post("/api/prayers", json={"type": "prayer", "title": "Admin only prayer",
+                                      "text": "For my family."})
+    admin_ids = {p["id"] for p in client.get("/api/prayers").json()}
+    assert any("Admin only prayer" in i for i in admin_ids)
+
+    # Simulate a Google user session
+    client.cookies.set("session", auth_mod.create_session_token("g:12345"))
+    r = client.get("/api/prayers")
+    assert r.status_code == 200
+    assert r.json() == []  # sees nothing of the admin vault
+    client.post("/api/prayers", json={"type": "request", "title": "Friend prayer",
+                                      "text": "A request from a friend.",
+                                      "requested_by": "Friend"})
+    friend_ids = {p["id"] for p in client.get("/api/prayers").json()}
+    assert any("Friend prayer" in i for i in friend_ids)
+    assert not (admin_ids & friend_ids)
+    # Google users cannot touch admin settings
+    assert client.get("/api/settings").status_code == 403
+    assert client.post("/api/settings", json={}).status_code == 403
+
+    # Admin still sees only their own notes
+    _login()
+    ids = {p["id"] for p in client.get("/api/prayers").json()}
+    assert not any("Friend prayer" in i for i in ids)
+
+
+def test_export_zip():
+    import io
+    import zipfile
+
+    _login()
+    r = client.get("/api/export.zip")
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "application/zip"
+    z = zipfile.ZipFile(io.BytesIO(r.content))
+    assert all(n.endswith(".md") for n in z.namelist())

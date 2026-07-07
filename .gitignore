@@ -6,3 +6,5 @@ __pycache__/
 .pytest_cache/
 caddy_data/
 caddy_config/
+*.png
+users/

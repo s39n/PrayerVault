@@ -26,6 +26,23 @@ def record_failure(ip: str) -> None:
     _attempts.setdefault(ip, []).append(time.time())
 
 
+# --- AI usage limiting (in-memory, per user) ---
+# With open Google signup anyone can create an account; this keeps one user
+# from monopolizing the local model.
+_ai_calls: dict[str, list[float]] = {}
+AI_MAX_PER_HOUR = 30
+
+
+def check_ai_limit(user: str) -> None:
+    now = time.time()
+    recent = [t for t in _ai_calls.get(user, []) if now - t < 3600]
+    if len(recent) >= AI_MAX_PER_HOUR:
+        _ai_calls[user] = recent
+        raise HTTPException(429, "AI limit reached — please try again in an hour.")
+    recent.append(now)
+    _ai_calls[user] = recent
+
+
 def verify_credentials(username: str, password: str) -> bool:
     if username != config.AUTH_USERNAME:
         # Still run bcrypt to avoid timing side channel

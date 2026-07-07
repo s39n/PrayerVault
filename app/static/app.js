@@ -293,6 +293,27 @@ async function renderYou() {
   $("you-view").innerHTML = `
     <div class="greeting"><span class="eyebrow">You</span><h2>Settings</h2></div>
     <p class="meta" style="text-align:center">Loading…</p>`;
+  let me;
+  try { me = await api("/api/me"); }
+  catch (e) { $("you-view").innerHTML = `<p class="meta">${esc(e.message)}</p>`; return; }
+  const backupCard = `
+    <div class="card">
+      <div class="section-title">Backups</div>
+      <p class="meta">Your prayers are plain Markdown files. Download them anytime${APP_CONFIG.google_login ? ", or send a backup to your own Google Drive — the app can only see backup files it created" : ""}.</p>
+      <div class="row" style="margin-top:12px">
+        ${APP_CONFIG.google_login ? `<a class="drive-btn" href="/api/backup/drive">Back up to Google Drive</a>` : ""}
+        <a class="drive-btn" href="/api/export.zip">Download .zip</a>
+      </div>
+    </div>`;
+  if (!me.admin) {
+    $("you-view").innerHTML = `
+      <div class="greeting"><span class="eyebrow">You</span><h2>${esc(me.name || "Your account")}</h2></div>
+      <div class="card">
+        <div class="section-title">Account</div>
+        <p class="meta">Signed in with Google${me.email ? " as " + esc(me.email) : ""}. Your prayer journal is private to you.</p>
+      </div>` + backupCard;
+    return;
+  }
   let s;
   try { s = await api("/api/settings"); }
   catch (e) { $("you-view").innerHTML = `<p class="meta">${esc(e.message)}</p>`; return; }
@@ -347,7 +368,7 @@ async function renderYou() {
         <button id="pr-reset">Reset to built-in</button>
         <span id="pr-status" class="meta"></span>
       </div>
-    </div>`;
+    </div>` + backupCard;
   const gather = () => ({ morning: {
     enabled: $("mp-enabled").checked,
     delivery: $("mp-delivery").value,
@@ -560,6 +581,28 @@ document.querySelectorAll(".nav-item").forEach((b) =>
     else if (n === "you") renderYou();
     else { filterStatus = "ongoing"; renderList(); }
   }));
+
+function toast(msg) {
+  const t = document.createElement("div");
+  t.className = "toast";
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 5000);
+}
+
+let APP_CONFIG = { google_login: false };
+fetch("/api/app-config").then((r) => r.json()).then((c) => {
+  APP_CONFIG = c;
+  $("google-signin").classList.toggle("hidden", !c.google_login);
+}).catch(() => {});
+
+const _params = new URLSearchParams(location.search);
+if (_params.has("login") || _params.has("backup")) {
+  if (_params.get("login") === "failed") $("login-error").textContent = "Google sign-in didn't complete. Please try again.";
+  if (_params.get("backup") === "ok") toast("Backup saved to your Google Drive.");
+  if (_params.get("backup") === "failed") toast("Google Drive backup failed — please try again.");
+  history.replaceState(null, "", location.pathname);
+}
 
 api("/api/me").then(renderToday).catch(() => show("login-view"));
 
