@@ -26,8 +26,12 @@ body{
     linear-gradient(180deg, var(--bg2) 0%, var(--bg) 100%);
   background-attachment:fixed;min-height:100vh;
 }
-header{display:flex;align-items:center;justify-content:space-between;padding:16px 22px;background:transparent}
-header h1{font-size:1.15rem;margin:0;font-weight:normal;letter-spacing:2px;text-transform:uppercase;color:var(--accent-dark)}
+header{display:flex;align-items:center;justify-content:space-between;padding:14px 22px;position:sticky;top:0;z-index:5;
+  background:linear-gradient(180deg,rgba(250,245,232,.72),rgba(245,239,225,.5));
+  backdrop-filter:blur(14px) saturate(1.15);-webkit-backdrop-filter:blur(14px) saturate(1.15);
+  border-bottom:1px solid rgba(214,201,173,.45)}
+header h1{font-size:1.15rem;margin:0;font-weight:normal;letter-spacing:2px;text-transform:uppercase;color:var(--accent-dark);
+  text-shadow:0 0 10px rgba(255,252,240,.95),0 0 22px rgba(255,252,240,.8),0 0 38px rgba(255,250,235,.6)}
 header h1 em{color:var(--gold);font-style:italic;letter-spacing:1px;text-transform:none}
 main{max-width:760px;margin:0 auto;padding:12px 20px 60px}
 button{font-family:inherit;font-size:.95rem;border:1px solid var(--line);background:rgba(255,255,255,.55);color:var(--ink);padding:9px 16px;border-radius:24px;cursor:pointer;transition:background .2s,border-color .2s}
@@ -91,7 +95,7 @@ nav#nav.hidden{display:none}
 .fruit-card:hover{box-shadow:0 10px 30px rgba(120,100,60,.13);transform:translateY(-1px)}
 .fruit-card h3{font-size:1.1rem;font-weight:normal;margin:0 0 4px}
 .fruit-card .answered-on{color:var(--gold);font-size:.78rem;text-transform:uppercase;letter-spacing:1.5px}
-.veil{position:fixed;top:64px;height:calc(100vh - 64px);width:clamp(0px,calc((100vw - 880px) * 0.375),105px);z-index:0;pointer-events:none;overflow:hidden}
+.veil{position:fixed;top:0;height:100vh;width:clamp(28px,calc((100vw - 880px) * 0.375),105px);z-index:0;pointer-events:none;overflow:hidden}
 .veil-left{left:0}
 .veil-right{right:0}
 .veil-fabric{position:absolute;top:-4%;height:112%;width:calc(100% + 18px);background-size:100% 100%;background-repeat:no-repeat;will-change:transform;backface-visibility:hidden}
@@ -100,8 +104,12 @@ nav#nav.hidden{display:none}
 @keyframes swayL{0%,100%{transform:perspective(1200px) rotateY(0deg) skewX(0deg)}30%{transform:perspective(1200px) rotateY(3.8deg) skewX(-0.5deg)}55%{transform:perspective(1200px) rotateY(5.5deg) skewX(-0.9deg)}78%{transform:perspective(1200px) rotateY(2.4deg) skewX(-0.4deg)}}
 @keyframes swayR{0%,100%{transform:perspective(1200px) rotateY(0deg) skewX(0deg)}34%{transform:perspective(1200px) rotateY(-4deg) skewX(0.6deg)}58%{transform:perspective(1200px) rotateY(-5.5deg) skewX(0.9deg)}80%{transform:perspective(1200px) rotateY(-2.2deg) skewX(0.35deg)}}
 @media (prefers-reduced-motion:reduce){.veil-fabric{animation:none!important}}
-header,nav#nav,main{position:relative;z-index:1}
-@media (max-width:900px){.veil{display:none}}
+nav#nav,main{position:relative;z-index:1}
+@media (max-width:900px){
+  main{padding:12px 44px 60px}
+  header{padding:12px 40px 12px 44px}
+  nav#nav{padding-left:36px;padding-right:36px}
+}
 </style>
 </head>
 <body>
