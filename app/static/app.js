@@ -9,6 +9,7 @@ function show(view) {
   const loggedOut = view === "login-view";
   $("header-actions").classList.toggle("hidden", loggedOut);
   $("nav").classList.toggle("hidden", loggedOut);
+  document.body.classList.toggle("logged-out", loggedOut);
   if (pollTimer && view !== "detail-view") { clearInterval(pollTimer); pollTimer = null; }
 }
 
