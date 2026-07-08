@@ -104,7 +104,7 @@ nav#nav.hidden{display:none}
 .veil-fabric{position:absolute;top:-4%;height:112%;width:calc(100% + 18px);background-size:100% 100%;background-repeat:no-repeat;will-change:transform;backface-visibility:hidden}
 .veil-left .veil-fabric{left:-18px;background-image:url('/veil-left.svg?v=3');transform-origin:left center;animation:swayL 9s ease-in-out infinite}
 .veil-right .veil-fabric{right:-18px;background-image:url('/veil-right.svg?v=3');transform-origin:right center;animation:swayR 11s ease-in-out infinite;animation-delay:-3.5s}
-body.logged-out .veil{width:clamp(28px,calc(50vw - 190px - 20px),420px);transition:width .4s ease}
+body.logged-out .veil{width:clamp(28px,calc(50vw - 190px - 20px),520px);transition:width .4s ease}
 @keyframes swayL{0%,100%{transform:perspective(1200px) rotateY(0deg) skewX(0deg)}30%{transform:perspective(1200px) rotateY(3.8deg) skewX(-0.5deg)}55%{transform:perspective(1200px) rotateY(5.5deg) skewX(-0.9deg)}78%{transform:perspective(1200px) rotateY(2.4deg) skewX(-0.4deg)}}
 @keyframes swayR{0%,100%{transform:perspective(1200px) rotateY(0deg) skewX(0deg)}34%{transform:perspective(1200px) rotateY(-4deg) skewX(0.6deg)}58%{transform:perspective(1200px) rotateY(-5.5deg) skewX(0.9deg)}80%{transform:perspective(1200px) rotateY(-2.2deg) skewX(0.35deg)}}
 @media (prefers-reduced-motion:reduce){.veil-fabric{animation:none!important}}
