@@ -121,6 +121,139 @@ nav#nav,main{position:relative;z-index:1}
   #header-actions button{padding:7px 12px;font-size:.85rem}
   #header-actions button.link{padding:7px 4px}
 }
+
+/* Dictation interface styling */
+.dictate-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.dictate-textarea {
+  min-height: 240px;
+  font-size: 1.1rem;
+  line-height: 1.6;
+  background: var(--card);
+  border: 1px solid var(--line);
+  box-shadow: inset 0 2px 8px rgba(0,0,0,0.02);
+  margin-top: 6px;
+}
+.dictate-mic-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px 20px;
+  background: linear-gradient(180deg, rgba(255,253,247,0.95), rgba(249,242,228,0.95));
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow: 0 8px 28px rgba(120, 100, 60, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+.dictate-mic-btn {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--accent);
+  font-size: 2.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+  position: relative;
+  z-index: 2;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.dictate-mic-btn:hover {
+  border-color: var(--gold);
+  color: var(--gold);
+  transform: scale(1.05);
+}
+.dictate-mic-btn:active {
+  transform: scale(0.95);
+}
+.dictate-mic-btn.recording {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+  animation: pulse-red 1.5s infinite;
+  transform: scale(1.1);
+  box-shadow: 0 0 0 0 rgba(156, 74, 60, 0.7);
+}
+.dictate-mic-btn.transcribing {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  cursor: not-allowed;
+  transform: scale(1.0);
+}
+.dictate-status-text {
+  margin-top: 18px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--ink);
+  text-align: center;
+  z-index: 2;
+}
+.dictate-hint {
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-align: center;
+  font-style: italic;
+  z-index: 2;
+}
+.waveform {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  margin-top: 15px;
+  visibility: hidden;
+  z-index: 2;
+}
+.waveform.active {
+  visibility: visible;
+}
+.wave-bar {
+  width: 3px;
+  height: 8px;
+  background-color: var(--danger);
+  border-radius: 3px;
+  animation: bounce 0.6s ease-in-out infinite alternate;
+}
+.wave-bar:nth-child(2) { animation-delay: 0.1s; height: 16px; }
+.wave-bar:nth-child(3) { animation-delay: 0.2s; height: 24px; }
+.wave-bar:nth-child(4) { animation-delay: 0.3s; height: 14px; }
+.wave-bar:nth-child(5) { animation-delay: 0.4s; height: 20px; }
+.wave-bar:nth-child(6) { animation-delay: 0.15s; height: 10px; }
+.wave-bar:nth-child(7) { animation-delay: 0.25s; height: 22px; }
+.wave-bar:nth-child(8) { animation-delay: 0.35s; height: 12px; }
+
+@keyframes pulse-red {
+  0% { box-shadow: 0 0 0 0 rgba(156, 74, 60, 0.7); }
+  70% { box-shadow: 0 0 0 15px rgba(156, 74, 60, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(156, 74, 60, 0); }
+}
+@keyframes bounce {
+  from { transform: scaleY(0.3); }
+  to { transform: scaleY(1.0); }
+}
+.settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 10px;
+}
+@media (max-width: 500px) {
+  .settings-grid { grid-template-columns: 1fr; }
+}
 </style>
 </head>
 <body>
@@ -138,6 +271,7 @@ nav#nav,main{position:relative;z-index:1}
   <button class="nav-item" data-nav="prayers">Prayers</button>
   <button class="nav-item" data-nav="fruit">Fruit</button>
   <button class="nav-item" data-nav="ask">Ask</button>
+  <button class="nav-item" data-nav="dictate">Dictate</button>
   <button class="nav-item" data-nav="you">You</button>
 </nav>
 <main>
@@ -171,6 +305,7 @@ nav#nav,main{position:relative;z-index:1}
   <div id="list-view" class="hidden"></div>
   <div id="fruit-view" class="hidden"></div>
   <div id="ask-view" class="hidden"></div>
+  <div id="dictate-view" class="hidden"></div>
   <div id="you-view" class="hidden"></div>
   <div id="detail-view" class="hidden"></div>
   <div id="new-view" class="hidden"></div>

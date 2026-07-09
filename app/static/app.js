@@ -1,6 +1,6 @@
 "use strict";
 const $ = (id) => document.getElementById(id);
-const views = ["login-view", "today-view", "list-view", "fruit-view", "ask-view", "you-view", "detail-view", "new-view"];
+const views = ["login-view", "today-view", "list-view", "fruit-view", "ask-view", "dictate-view", "you-view", "detail-view", "new-view"];
 let filterStatus = "ongoing";
 let pollTimer = null;
 
@@ -11,6 +11,9 @@ function show(view) {
   $("nav").classList.toggle("hidden", loggedOut);
   document.body.classList.toggle("logged-out", loggedOut);
   if (pollTimer && view !== "detail-view") { clearInterval(pollTimer); pollTimer = null; }
+  if (view !== "dictate-view" && window._dictateStopRecording) {
+    window._dictateStopRecording();
+  }
 }
 
 function setNav(name) {
@@ -322,6 +325,371 @@ async function doAsk() {
   btn.innerHTML = "Seek an answer";
 }
 
+// ---------- Dictate (Speech to Text) ----------
+async function renderDictate() {
+  try {
+    const me = await api("/api/me");
+    if (!me || !me.admin) {
+      renderToday();
+      return;
+    }
+  } catch (e) {
+    show("login-view");
+    return;
+  }
+
+  show("dictate-view");
+  setNav("dictate");
+  
+  $("dictate-view").innerHTML = `
+    <div class="greeting">
+      <span class="eyebrow">Dictate</span>
+      <h2>Speech to Text</h2>
+    </div>
+    <div class="card dictate-container">
+      <div style="display:flex; justify-content:space-between; align-items:center">
+        <label style="margin:0">Transcribed Text</label>
+        <span id="dictate-char-count" class="meta" style="font-size:0.8rem">0 characters</span>
+      </div>
+      <textarea id="dictate-text" class="dictate-textarea" placeholder="Start speaking using the hotkey, or type here..."></textarea>
+      <div class="row" style="margin-top:6px; justify-content:space-between">
+        <div class="row">
+          <button id="dictate-btn-copy" class="primary btn-dictate-action" title="Copy to clipboard">📋 Copy</button>
+          <button id="dictate-btn-clear" class="btn-dictate-action" title="Clear text">🗑️ Clear</button>
+          <button id="dictate-btn-download" class="btn-dictate-action" title="Download as .txt file">💾 Download</button>
+        </div>
+        <button id="dictate-btn-new-prayer" class="btn-dictate-action" style="border-color:var(--gold); color:var(--gold)" title="Create a new prayer note with this text">✨ Create Prayer</button>
+      </div>
+      <div class="error-msg" id="dictate-error"></div>
+    </div>
+    <div class="card dictate-mic-container">
+      <button id="dictate-mic-btn" class="dictate-mic-btn" aria-label="Record button">🎙️</button>
+      <div id="dictate-status" class="dictate-status-text">Ready to Record</div>
+      <div id="dictate-hint" class="dictate-hint">Press and hold Spacebar to speak (Push-to-Talk)</div>
+      <div class="waveform" id="dictate-waveform">
+        <div class="wave-bar"></div>
+        <div class="wave-bar"></div>
+        <div class="wave-bar"></div>
+        <div class="wave-bar"></div>
+        <div class="wave-bar"></div>
+        <div class="wave-bar"></div>
+        <div class="wave-bar"></div>
+        <div class="wave-bar"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="section-title">Dictation Settings</div>
+      <div class="settings-grid">
+        <div>
+          <label>Mode</label>
+          <select id="dictate-setting-mode">
+            <option value="ptt">Push-to-Talk (Hold key/button to record)</option>
+            <option value="toggle">Tap-to-Talk (Tap key/button to toggle)</option>
+          </select>
+        </div>
+        <div>
+          <label>Hotkey</label>
+          <select id="dictate-setting-hotkey">
+            <option value="Space">Spacebar</option>
+            <option value="Backquote">Backtick (`)</option>
+            <option value="Control">Control (Ctrl)</option>
+            <option value="Shift">Shift</option>
+            <option value="Alt">Alt</option>
+          </select>
+        </div>
+      </div>
+      <p class="meta" style="margin-top:12px; font-size:0.8rem">
+        * Spacebar hotkey only works when you are not typing in a text field.<br>
+        * Dictation requires microphone permission. Please make sure HTTPS or localhost is used.
+      </p>
+    </div>`;
+
+  let mediaRecorder = null;
+  let audioChunks = [];
+  let recordStartTime = null;
+  let recordDurationInterval = null;
+  let activeStream = null;
+
+  const micBtn = $("dictate-mic-btn");
+  const statusText = $("dictate-status");
+  const hintText = $("dictate-hint");
+  const waveform = $("dictate-waveform");
+  const errorText = $("dictate-error");
+  const dictateText = $("dictate-text");
+
+  let mode = localStorage.getItem("dictate_mode") || "ptt";
+  let hotkey = localStorage.getItem("dictate_hotkey") || "Space";
+  
+  $("dictate-setting-mode").value = mode;
+  $("dictate-setting-hotkey").value = hotkey;
+
+  function updateHint() {
+    const keyLabel = {
+      "Space": "Spacebar",
+      "Backquote": "Backtick (`)",
+      "Control": "Control Key",
+      "Shift": "Shift Key",
+      "Alt": "Alt Key"
+    }[hotkey];
+    
+    if (mode === "ptt") {
+      hintText.textContent = `Hold the ${keyLabel} or hold the mic button to record.`;
+    } else {
+      hintText.textContent = `Press the ${keyLabel} or tap the mic button to start/stop.`;
+    }
+  }
+  updateHint();
+
+  function updateCharCount() {
+    const chars = dictateText.value.length;
+    $("dictate-char-count").textContent = `${chars} character${chars === 1 ? "" : "s"}`;
+  }
+  dictateText.addEventListener("input", updateCharCount);
+
+  async function startRecording() {
+    if (mediaRecorder && mediaRecorder.state !== "inactive") return;
+    errorText.textContent = "";
+    audioChunks = [];
+    if (!navigator.mediaDevices?.getUserMedia) {
+      errorText.textContent = "Microphone needs a secure connection (HTTPS or localhost).";
+      return;
+    }
+    try {
+      activeStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(activeStream);
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) audioChunks.push(e.data);
+      };
+      
+      mediaRecorder.onstop = async () => {
+        if (activeStream) {
+          activeStream.getTracks().forEach(track => track.stop());
+          activeStream = null;
+        }
+        clearInterval(recordDurationInterval);
+        micBtn.className = "dictate-mic-btn transcribing";
+        micBtn.innerHTML = "⏳";
+        statusText.textContent = "Transcribing your voice...";
+        waveform.classList.remove("active");
+        
+        try {
+          const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || "audio/webm" });
+          if (blob.size === 0) throw new Error("Recording is empty.");
+          const fd = new FormData();
+          fd.append("audio", blob, "dictation.webm");
+          const r = await fetch("/api/transcribe", { method: "POST", body: fd, credentials: "same-origin" });
+          if (!r.ok) {
+            const errData = await r.json().catch(() => ({}));
+            throw new Error(errData.detail || "Transcription failed.");
+          }
+          const result = await r.json();
+          const transcribedText = result.text || "";
+          if (transcribedText.trim()) {
+            const oldVal = dictateText.value.trim();
+            dictateText.value = (oldVal ? oldVal + " " : "") + transcribedText.trim();
+            updateCharCount();
+            toast("Transcribed successfully!");
+          } else {
+            toast("No speech detected.");
+          }
+        } catch (err) {
+          errorText.textContent = err.message;
+          toast("Transcription failed.");
+        } finally {
+          micBtn.className = "dictate-mic-btn";
+          micBtn.innerHTML = "🎙️";
+          statusText.textContent = "Ready to Record";
+        }
+      };
+      
+      mediaRecorder.start();
+      recordStartTime = Date.now();
+      micBtn.className = "dictate-mic-btn recording";
+      micBtn.innerHTML = "🛑";
+      waveform.classList.add("active");
+      
+      statusText.textContent = "Recording... 0:00";
+      recordDurationInterval = setInterval(() => {
+        const elapsed = Math.round((Date.now() - recordStartTime) / 1000);
+        const mins = Math.floor(elapsed / 60);
+        const secs = elapsed % 60;
+        statusText.textContent = `Recording... ${mins}:${secs.toString().padStart(2, '0')}`;
+      }, 1000);
+    } catch (err) {
+      errorText.textContent = "Microphone access denied: " + err.message;
+      micBtn.className = "dictate-mic-btn";
+      micBtn.innerHTML = "🎙️";
+      statusText.textContent = "Ready to Record";
+    }
+  }
+
+  function stopRecording() {
+    if (mediaRecorder && mediaRecorder.state === "recording") {
+      mediaRecorder.stop();
+    }
+  }
+
+  window._dictateStopRecording = stopRecording;
+
+  function setupMicButton() {
+    const btn = $("dictate-mic-btn");
+    const cloned = btn.cloneNode(true);
+    btn.parentNode.replaceChild(cloned, btn);
+    
+    if (mode === "ptt") {
+      let isDown = false;
+      const start = (e) => {
+        e.preventDefault();
+        if (isDown) return;
+        isDown = true;
+        startRecording();
+      };
+      const end = (e) => {
+        e.preventDefault();
+        if (!isDown) return;
+        isDown = false;
+        stopRecording();
+      };
+      cloned.addEventListener("mousedown", start);
+      cloned.addEventListener("touchstart", start, { passive: false });
+      cloned.addEventListener("mouseup", end);
+      cloned.addEventListener("mouseleave", end);
+      cloned.addEventListener("touchend", end, { passive: false });
+      cloned.addEventListener("touchcancel", end, { passive: false });
+    } else {
+      cloned.addEventListener("click", (e) => {
+        e.preventDefault();
+        if (mediaRecorder && mediaRecorder.state === "recording") {
+          stopRecording();
+        } else {
+          startRecording();
+        }
+      });
+    }
+  }
+  setupMicButton();
+
+  function isTyping() {
+    const active = document.activeElement;
+    if (!active) return false;
+    return active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.isContentEditable;
+  }
+
+  const handleKeyDown = (e) => {
+    if ($("dictate-view").classList.contains("hidden")) return;
+    let match = false;
+    if (hotkey === "Space" && e.code === "Space") {
+      if (isTyping()) return;
+      match = true;
+    } else if (hotkey === "Backquote" && e.code === "Backquote") {
+      match = true;
+    } else if (hotkey === "Control" && e.key === "Control") {
+      match = true;
+    } else if (hotkey === "Shift" && e.key === "Shift") {
+      match = true;
+    } else if (hotkey === "Alt" && e.key === "Alt") {
+      match = true;
+    }
+    
+    if (match) {
+      e.preventDefault();
+      if (mode === "ptt") {
+        if (!window._dictateKeyPressed) {
+          window._dictateKeyPressed = true;
+          startRecording();
+        }
+      } else {
+        if (!window._dictateKeyPressed) {
+          window._dictateKeyPressed = true;
+          if (mediaRecorder && mediaRecorder.state === "recording") {
+            stopRecording();
+          } else {
+            startRecording();
+          }
+        }
+      }
+    }
+  };
+
+  const handleKeyUp = (e) => {
+    if ($("dictate-view").classList.contains("hidden")) return;
+    let match = false;
+    if (hotkey === "Space" && e.code === "Space") match = true;
+    else if (hotkey === "Backquote" && e.code === "Backquote") match = true;
+    else if (hotkey === "Control" && e.key === "Control") match = true;
+    else if (hotkey === "Shift" && e.key === "Shift") match = true;
+    else if (hotkey === "Alt" && e.key === "Alt") match = true;
+    
+    if (match) {
+      window._dictateKeyPressed = false;
+      if (mode === "ptt") stopRecording();
+    }
+  };
+
+  if (window._dictateKeydown) window.removeEventListener("keydown", window._dictateKeydown);
+  if (window._dictateKeyup) window.removeEventListener("keyup", window._dictateKeyup);
+  window._dictateKeydown = handleKeyDown;
+  window._dictateKeyup = handleKeyUp;
+  window.addEventListener("keydown", window._dictateKeydown);
+  window.addEventListener("keyup", window._dictateKeyup);
+
+  $("dictate-setting-mode").addEventListener("change", (e) => {
+    mode = e.target.value;
+    localStorage.setItem("dictate_mode", mode);
+    updateHint();
+    setupMicButton();
+  });
+  
+  $("dictate-setting-hotkey").addEventListener("change", (e) => {
+    hotkey = e.target.value;
+    localStorage.setItem("dictate_hotkey", hotkey);
+    updateHint();
+    setupMicButton();
+  });
+
+  $("dictate-btn-copy").addEventListener("click", () => {
+    const text = dictateText.value;
+    if (!text) { toast("Nothing to copy."); return; }
+    navigator.clipboard.writeText(text).then(() => {
+      const copyBtn = $("dictate-btn-copy");
+      const origText = copyBtn.textContent;
+      copyBtn.textContent = "✅ Copied!";
+      toast("Text copied to clipboard.");
+      setTimeout(() => { copyBtn.textContent = origText; }, 2000);
+    }).catch(err => { toast("Failed to copy text: " + err); });
+  });
+
+  $("dictate-btn-clear").addEventListener("click", () => {
+    if (dictateText.value.trim() && confirm("Are you sure you want to clear the transcribed text?")) {
+      dictateText.value = "";
+      updateCharCount();
+      toast("Text cleared.");
+    }
+  });
+
+  $("dictate-btn-download").addEventListener("click", () => {
+    const text = dictateText.value;
+    if (!text) { toast("Nothing to download."); return; }
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const dateStr = new Date().toISOString().slice(0, 10);
+    a.download = `dictation-${dateStr}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast("Download started.");
+  });
+
+  $("dictate-btn-new-prayer").addEventListener("click", () => {
+    const text = dictateText.value;
+    if (!text) { toast("Write or dictate some text first."); return; }
+    renderNew(text);
+  });
+}
+
 // ---------- You (settings) ----------
 async function renderYou() {
   show("you-view");
@@ -523,7 +891,8 @@ async function renderDetail(id) {
 }
 
 // ---------- New ----------
-function renderNew() {
+function renderNew(initialText = "") {
+  if (typeof initialText !== "string") initialText = "";
   show("new-view");
   $("new-view").innerHTML = `
     <button class="link" id="btn-back2">&larr; Back</button>
@@ -540,7 +909,7 @@ function renderNew() {
         <label style="margin-bottom:4px">Prayer</label>
         <button id="np-mic" title="Speak your prayer">&#127908; Record</button>
       </div>
-      <textarea id="np-text" placeholder="Pour it out here… or press Record and speak"></textarea>
+      <textarea id="np-text" placeholder="Pour it out here… or press Record and speak">${esc(initialText)}</textarea>
       <div class="error-msg" id="np-error"></div>
       <button class="primary" id="np-save" style="margin-top:6px">Save &amp; seek Scripture</button>
     </div>`;
@@ -600,6 +969,8 @@ async function doLogin() {
     await api("/api/login", { method: "POST", body: JSON.stringify({
       username: $("login-user").value.trim(), password: $("login-pass").value,
     })});
+    const me = await api("/api/me");
+    checkAdminAccess(me);
     renderToday();
   } catch (e) { if (e.message !== "auth") $("login-error").textContent = e.message; else $("login-error").textContent = "Invalid username or password"; }
 }
@@ -614,6 +985,7 @@ document.querySelectorAll(".nav-item").forEach((b) =>
     if (n === "today") renderToday();
     else if (n === "fruit") renderFruit();
     else if (n === "ask") renderAsk();
+    else if (n === "dictate") renderDictate();
     else if (n === "you") renderYou();
     else { filterStatus = "ongoing"; renderList(); }
   }));
@@ -640,7 +1012,20 @@ if (_params.has("login") || _params.has("backup")) {
   history.replaceState(null, "", location.pathname);
 }
 
-api("/api/me").then(renderToday).catch(() => show("login-view"));
+function checkAdminAccess(me) {
+  const dictateNav = document.querySelector('.nav-item[data-nav="dictate"]');
+  if (dictateNav) {
+    dictateNav.classList.toggle("hidden", !me || !me.admin);
+  }
+}
+
+api("/api/me").then((me) => {
+  checkAdminAccess(me);
+  renderToday();
+}).catch(() => {
+  checkAdminAccess(null);
+  show("login-view");
+});
 
 // ---- PWA: install support ----
 if ("serviceWorker" in navigator) {
