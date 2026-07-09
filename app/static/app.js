@@ -391,7 +391,7 @@ async function renderDictate() {
           <label>Hotkey</label>
           <select id="dictate-setting-hotkey">
             <option value="Space">Spacebar</option>
-            <option value="Backquote">Backtick (`)</option>
+            <option value="Backquote">Backtick (\`)</option>
             <option value="Control">Control (Ctrl)</option>
             <option value="Shift">Shift</option>
             <option value="Alt">Alt</option>
