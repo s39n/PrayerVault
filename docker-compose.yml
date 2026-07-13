@@ -12,9 +12,12 @@ services:
       - OLLAMA_URL=${OLLAMA_URL:-http://ollama:11434}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2:3b}
       - USERS_DIR=/users
+      - DATA_DIR=/data
     volumes:
       - "${PRAYERS_DIR}:/vault"
       - "${USERS_DIR_HOST:-./users}:/users"
+      # Multi-church database — persist it so a rebuild doesn't wipe churches.
+      - "${DATA_DIR_HOST:-./data}:/data"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     # For LAN-only use without Caddy, uncomment and set COOKIE_SECURE=false in .env:

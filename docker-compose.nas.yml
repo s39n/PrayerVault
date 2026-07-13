@@ -50,6 +50,8 @@ services:
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
       - PUBLIC_URL=${PUBLIC_URL:-https://${DOMAIN:-}}
       - USERS_DIR=/users
+      # Relational DB (churches, members, shared prayers) lives on a volume.
+      - DATA_DIR=/data
     ports:
       - "${LAN_PORT:-8800}:8000"
     volumes:
@@ -57,15 +59,19 @@ services:
       # Google users' journals. Set USERS_DIR_HOST to a host folder to make
       # them easy to find/back up; defaults to a named docker volume.
       - "${USERS_DIR_HOST:-user_journals}:/users"
+      # Multi-church database. MUST be a volume — without this a redeploy wipes
+      # every church, member, and shared prayer. Named docker volume by default.
+      - "${DATA_DIR_HOST:-app_data}:/data"
 
   # One-shot: the app runs as PUID:PGID but docker creates the users volume as
   # root — this hands ownership to the app user so Google signups can write.
   users-init:
     image: busybox
     restart: "no"
-    command: sh -c "chown ${PUID:-1000}:${PGID:-1000} /users"
+    command: sh -c "chown ${PUID:-1000}:${PGID:-1000} /users /data"
     volumes:
       - "${USERS_DIR_HOST:-user_journals}:/users"
+      - "${DATA_DIR_HOST:-app_data}:/data"
 
   ollama:
     image: ollama/ollama:latest
@@ -119,3 +125,4 @@ volumes:
   ollama_models:
   whisper_cache:
   user_journals:
+  app_data:
