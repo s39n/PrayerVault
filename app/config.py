@@ -36,6 +36,15 @@ PUBLIC_URL = os.environ.get(
 # Where Google users' prayer folders live (the admin keeps VAULT_DIR).
 USERS_DIR = os.environ.get("USERS_DIR", "users")
 
+# --- Relational multi-tenant layer (Phase 0; see docs/multiuser-prayer-sharing-plan.md) ---
+# The database is the source of truth for the multi-church social layer (churches,
+# users, memberships, groups, shared prayers, notifications). Private journal prayers
+# still live as Markdown in VAULT_DIR/USERS_DIR and are untouched by this.
+DATA_DIR = os.environ.get("DATA_DIR", "data")
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL", "sqlite:///" + os.path.join(DATA_DIR, "prayervault.db")
+)
+
 if not SESSION_SECRET:
     raise RuntimeError("SESSION_SECRET is not set. See .env.example.")
 if not AUTH_PASSWORD_HASH:

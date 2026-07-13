@@ -9,14 +9,19 @@ from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse,
                                RedirectResponse)
 from pydantic import BaseModel, Field
 
-from . import (auth, config, embeddings, google_auth, notes, notify,
+from . import (auth, config, db, embeddings, google_auth, notes, notify,
                ollama_client, settings, stt, users)
+from .church_api import router as church_router
 
 log = logging.getLogger("prayervault")
 logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(title="PrayerVault", docs_url=None, redoc_url=None, openapi_url=None)
 STATIC = Path(__file__).parent / "static"
+
+# Multi-church prayer-sharing API (accounts, churches, elder flow). Distinct route
+# prefixes from the legacy single-user vault routes below.
+app.include_router(church_router)
 
 
 @app.middleware("http")
@@ -348,6 +353,9 @@ async def _morning_loop():
 
 @app.on_event("startup")
 async def _start_scheduler():
+    # Ensure the relational multi-tenant tables exist (Alembic owns migrations in
+    # production; this makes a fresh NAS deploy and local dev zero-config).
+    db.init_db()
     asyncio.create_task(_morning_loop())
 
 

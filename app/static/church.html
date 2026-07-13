@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PrayerVault — Church</title>
+<style>
+  :root {
+    --bg:#f7f5f0; --card:#fff; --ink:#2a2622; --muted:#8a8178; --line:#e7e1d8;
+    --accent:#6b5b4d; --accent-ink:#fff; --ok:#3f7d5c; --warn:#b06a3b;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:Georgia, "Times New Roman", serif; background:var(--bg);
+         color:var(--ink); line-height:1.5; }
+  header { display:flex; align-items:center; justify-content:space-between;
+           padding:14px 18px; border-bottom:1px solid var(--line); background:var(--card); }
+  header h1 { font-size:18px; margin:0; letter-spacing:.5px; }
+  header .who { font-size:13px; color:var(--muted); }
+  main { max-width:720px; margin:0 auto; padding:18px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px;
+          padding:16px; margin:0 0 14px; }
+  h2 { font-size:16px; margin:0 0 10px; }
+  h3 { font-size:14px; margin:14px 0 6px; color:var(--muted); text-transform:uppercase;
+       letter-spacing:.6px; }
+  label { display:block; font-size:13px; color:var(--muted); margin:8px 0 3px; }
+  input, textarea, select {
+    width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:7px;
+    font:inherit; background:#fdfcfa; color:var(--ink); }
+  textarea { min-height:70px; resize:vertical; }
+  button { font:inherit; cursor:pointer; border:none; border-radius:7px;
+           padding:9px 14px; background:var(--accent); color:var(--accent-ink); }
+  button.ghost { background:transparent; color:var(--accent); border:1px solid var(--line); }
+  button.link { background:none; color:var(--accent); padding:0; text-decoration:underline; }
+  button.small { padding:5px 10px; font-size:13px; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .spacer { flex:1; }
+  .tabs { display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap; }
+  .tabs button { background:transparent; color:var(--ink); border:1px solid var(--line); }
+  .tabs button.active { background:var(--accent); color:var(--accent-ink); }
+  .prayer { border:1px solid var(--line); border-radius:9px; padding:12px; margin-bottom:10px;
+            cursor:pointer; background:#fdfcfa; }
+  .prayer:hover { border-color:var(--accent); }
+  .prayer .title { font-weight:bold; }
+  .badge { font-size:11px; padding:2px 8px; border-radius:20px; border:1px solid var(--line);
+           color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
+  .badge.answered { color:var(--ok); border-color:var(--ok); }
+  .badge.unclaimed { color:var(--warn); border-color:var(--warn); }
+  .update { border-left:3px solid var(--line); padding:4px 0 4px 10px; margin:6px 0;
+            font-size:14px; }
+  .update .k { font-size:11px; color:var(--muted); text-transform:uppercase; }
+  .note { background:#fff7ec; border:1px solid #f0dcc0; border-radius:7px; padding:8px 10px;
+          margin:6px 0; font-size:14px; }
+  .muted { color:var(--muted); font-size:13px; }
+  .err { color:#a3342b; font-size:13px; min-height:16px; margin-top:6px; }
+  .hidden { display:none; }
+  .center { text-align:center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>PrayerVault</h1>
+  <div class="row">
+    <span class="who" id="who"></span>
+    <button class="link" id="logoutBtn">Sign out</button>
+  </div>
+</header>
+<main id="app"><p class="muted center">Loading…</p></main>
+<script src="/church.js"></script>
+</body>
+</html>
