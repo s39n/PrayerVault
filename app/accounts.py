@@ -116,8 +116,10 @@ def create_invitation(org_id: str, inviter_id: str, email: str,
         t.session.flush()
         inv.token = _invite.dumps({"inv": inv.id})
         t.add(inv)
+        org = t.organization()
         return {"invitation_id": inv.id, "token": inv.token, "email": email,
-                "church_role": church_role}
+                "church_role": church_role,
+                "church_name": org.name if org else ""}
 
 
 def accept_invitation(token: str, name: str, password: str) -> dict:

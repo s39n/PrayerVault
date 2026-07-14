@@ -10,7 +10,7 @@ from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse,
 from pydantic import BaseModel, Field
 
 from . import (auth, config, db, embeddings, google_auth, notes, notify,
-               ollama_client, settings, stt, users)
+               notifications, ollama_client, settings, stt, users)
 from .church_api import router as church_router
 
 log = logging.getLogger("prayervault")
@@ -351,12 +351,24 @@ async def _morning_loop():
         await asyncio.sleep(30)
 
 
+async def _dispatch_loop():
+    """Safety net: flush any queued notifications the request-time background tasks
+    didn't deliver (e.g. queued while SMTP was down). Sends resume once SMTP works."""
+    while True:
+        try:
+            notifications.dispatch_pending()
+        except Exception:
+            log.exception("Notification dispatch error")
+        await asyncio.sleep(60)
+
+
 @app.on_event("startup")
 async def _start_scheduler():
     # Ensure the relational multi-tenant tables exist (Alembic owns migrations in
     # production; this makes a fresh NAS deploy and local dev zero-config).
     db.init_db()
     asyncio.create_task(_morning_loop())
+    asyncio.create_task(_dispatch_loop())
 
 
 # ---------- Frontend ----------

@@ -11,20 +11,31 @@ single-user ``/api/prayers`` routes in ``main.py``.
 """
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import (APIRouter, BackgroundTasks, Depends, HTTPException, Request,
+                     Response)
 from fastapi.responses import FileResponse
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from pydantic import BaseModel, Field
 
-from . import accounts, config, orgs, prayer_service as ps
+from . import accounts, config, notifications, orgs, prayer_service as ps
 from .accounts import AccountError
 from .orgs import OrgError
 from .prayer_service import PermissionDenied, PrayerError
 
 router = APIRouter()
 STATIC = Path(__file__).parent / "static"
+log = logging.getLogger("prayervault.api")
+
+
+def _safe_invite_email(to: str, church_name: str, inviter: str, accept_url: str) -> None:
+    """Best-effort: an SMTP problem must never fail the invite itself."""
+    try:
+        notifications.email_invitation(to, church_name, inviter, accept_url)
+    except Exception as e:
+        log.warning("invitation email to %s failed: %s", to, e)
 
 _session = URLSafeTimedSerializer(config.SESSION_SECRET, salt="prayervault-account")
 COOKIE = "account"
@@ -151,10 +162,14 @@ async def account_me(acct: dict = Depends(require_account)):
 
 
 @router.post("/api/invites")
-async def create_invite(body: InviteBody, acct: dict = Depends(require_account)):
+async def create_invite(body: InviteBody, bg: BackgroundTasks,
+                        acct: dict = Depends(require_account)):
     r = _handle(lambda: accounts.create_invitation(
         acct["org_id"], acct["user_id"], body.email, body.church_role))
-    return r
+    accept_url = f"{config.PUBLIC_URL}/church?invite={r['token']}"
+    inviter = acct.get("name") or acct.get("email")
+    bg.add_task(_safe_invite_email, r["email"], r.get("church_name", ""), inviter, accept_url)
+    return {**r, "accept_url": accept_url}
 
 
 @router.post("/api/invites/accept")
@@ -167,9 +182,11 @@ async def accept_invite(body: AcceptBody, response: Response):
 # --- requests to the elders ---------------------------------------------
 
 @router.post("/api/requests")
-async def new_request(body: NewRequest, acct: dict = Depends(require_account)):
+async def new_request(body: NewRequest, bg: BackgroundTasks,
+                      acct: dict = Depends(require_account)):
     pid = _handle(lambda: ps.create_elder_request(
         acct["org_id"], acct["user_id"], body.title, body.body, body.subject_name))
+    bg.add_task(notifications.dispatch_pending)
     return {"id": pid}
 
 
@@ -201,8 +218,9 @@ async def get_shared(pid: str, acct: dict = Depends(require_account)):
 # --- a single shared prayer ---------------------------------------------
 
 @router.post("/api/shared/{pid}/claim")
-async def claim(pid: str, acct: dict = Depends(require_account)):
+async def claim(pid: str, bg: BackgroundTasks, acct: dict = Depends(require_account)):
     _handle(lambda: ps.claim(acct["org_id"], pid, acct["user_id"]))
+    bg.add_task(notifications.dispatch_pending)
     return {"ok": True}
 
 
@@ -213,15 +231,19 @@ async def assign(pid: str, body: AssignBody, acct: dict = Depends(require_accoun
 
 
 @router.post("/api/shared/{pid}/updates")
-async def add_update(pid: str, body: TextBody, acct: dict = Depends(require_account)):
+async def add_update(pid: str, body: TextBody, bg: BackgroundTasks,
+                     acct: dict = Depends(require_account)):
     _handle(lambda: ps.add_update(acct["org_id"], pid, acct["user_id"], body.text))
+    bg.add_task(notifications.dispatch_pending)
     return {"ok": True}
 
 
 @router.post("/api/shared/{pid}/status")
-async def set_status(pid: str, body: StatusBody, acct: dict = Depends(require_account)):
+async def set_status(pid: str, body: StatusBody, bg: BackgroundTasks,
+                     acct: dict = Depends(require_account)):
     _handle(lambda: ps.set_status(acct["org_id"], pid, acct["user_id"],
                                   body.answered, body.text))
+    bg.add_task(notifications.dispatch_pending)
     return {"ok": True}
 
 
