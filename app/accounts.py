@@ -150,3 +150,38 @@ def accept_invitation(token: str, name: str, password: str) -> dict:
         s.flush()
         return {"user_id": user.id, "org_id": inv.org_id, "email": inv.email,
                 "name": user.display_name, "role": inv.church_role}
+
+
+# --- notification preferences --------------------------------------------
+
+def _prefs_dict(p: models.NotificationPref) -> dict:
+    return {"email_enabled": p.email_enabled, "digest_weekly": p.digest_weekly,
+            "digest_day": p.digest_day, "email_address": p.email_address}
+
+
+def get_prefs(user_id: str) -> dict:
+    """A user's notification preferences (defaults if they've never set them)."""
+    with db.session_scope() as s:
+        p = s.get(models.NotificationPref, user_id)
+        if p is None:
+            return {"email_enabled": True, "digest_weekly": False,
+                    "digest_day": 0, "email_address": ""}
+        return _prefs_dict(p)
+
+
+def set_prefs(user_id: str, email_enabled: bool | None = None,
+              digest_weekly: bool | None = None, digest_day: int | None = None) -> dict:
+    """Upsert notification preferences. Only provided fields are changed."""
+    with db.session_scope() as s:
+        p = s.get(models.NotificationPref, user_id)
+        if p is None:
+            p = models.NotificationPref(user_id=user_id)
+        if email_enabled is not None:
+            p.email_enabled = email_enabled
+        if digest_weekly is not None:
+            p.digest_weekly = digest_weekly
+        if digest_day is not None:
+            p.digest_day = max(0, min(6, int(digest_day)))
+        s.add(p)
+        s.flush()
+        return _prefs_dict(p)

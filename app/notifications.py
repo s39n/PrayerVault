@@ -194,3 +194,93 @@ def _deliver(s, n: models.Notification) -> None:
         send_email(to, subject, body)
     else:
         raise RuntimeError(f"channel {n.channel} not deliverable yet")
+
+
+# --- weekly digest -------------------------------------------------------
+
+def build_weekly_digest(user_id: str, days: int = 7) -> tuple[str, str] | None:
+    """Summarize the past week for one user. None when there's nothing to say."""
+    from datetime import timedelta
+    cutoff = _now() - timedelta(days=days)
+    with db.session_scope() as s:
+        user = s.get(models.User, user_id)
+        if user is None:
+            return None
+        subs = s.exec(
+            select(models.Subscription).where(
+                models.Subscription.user_id == user_id,
+                models.Subscription.muted == False,  # noqa: E712
+            )
+        ).all()
+        answered, active = [], []
+        for sub in subs:
+            p = s.get(models.Prayer, sub.prayer_id)
+            if p is None:
+                continue
+            recent = [u for u in s.exec(
+                select(models.PrayerUpdate).where(models.PrayerUpdate.prayer_id == p.id)
+            ).all() if _aware(u.created_at) >= cutoff]
+            if p.status == "answered" and p.answered_at and _aware(p.answered_at) >= cutoff:
+                answered.append(p.title)
+            elif recent:
+                active.append((p.title, len(recent)))
+
+        membership = s.exec(
+            select(models.Membership).where(models.Membership.user_id == user_id)
+        ).first()
+        unclaimed = 0
+        if membership and membership.role in ("elder", "admin"):
+            unclaimed = len(s.exec(
+                select(models.Prayer).where(
+                    models.Prayer.org_id == user.org_id,
+                    models.Prayer.visibility == "elders",
+                    models.Prayer.owner_id.is_(None),
+                    models.Prayer.status == "ongoing",
+                )
+            ).all())
+
+    if not (answered or active or unclaimed):
+        return None
+    lines = ["Here's this week on your prayer list.\n"]
+    if unclaimed:
+        lines.append(f"• {unclaimed} request(s) are waiting for an elder to claim.")
+    for title, n in active:
+        lines.append(f"• “{title}” — {n} new update(s).")
+    for title in answered:
+        lines.append(f"• “{title}” was answered. Praise God!")
+    lines.append(f"\nOpen PrayerVault: {config.PUBLIC_URL}/church")
+    return "Your weekly prayer digest", "\n".join(lines)
+
+
+def send_weekly_digests(weekday: int) -> dict:
+    """Send digests to everyone opted into a digest on ``weekday`` (0=Mon..6=Sun)."""
+    sent = skipped = 0
+    with db.session_scope() as s:
+        prefs = s.exec(
+            select(models.NotificationPref).where(
+                models.NotificationPref.digest_weekly == True,  # noqa: E712
+                models.NotificationPref.digest_day == weekday,
+            )
+        ).all()
+        targets = [(p.user_id, p.email_address) for p in prefs]
+        users = {u.id: u for u in s.exec(select(models.User)).all()}
+    for user_id, pref_email in targets:
+        digest = build_weekly_digest(user_id)
+        if digest is None:
+            skipped += 1
+            continue
+        to = pref_email or (users[user_id].email if user_id in users else "")
+        if not to:
+            skipped += 1
+            continue
+        try:
+            send_email(to, digest[0], digest[1])
+            sent += 1
+        except Exception as e:
+            log.warning("digest to %s failed: %s", to, e)
+    return {"sent": sent, "skipped": skipped}
+
+
+def _aware(dt):
+    from datetime import timezone as _tz
+    return dt if dt.tzinfo else dt.replace(tzinfo=_tz.utc)

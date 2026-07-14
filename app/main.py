@@ -362,6 +362,20 @@ async def _dispatch_loop():
         await asyncio.sleep(60)
 
 
+async def _digest_loop():
+    """Send weekly digests once per day at 07:00 to whoever is due that weekday."""
+    last_run = None
+    while True:
+        try:
+            now = datetime.datetime.now()
+            if now.hour == 7 and last_run != now.date():
+                notifications.send_weekly_digests(now.weekday())
+                last_run = now.date()
+        except Exception:
+            log.exception("Digest scheduler error")
+        await asyncio.sleep(60)
+
+
 @app.on_event("startup")
 async def _start_scheduler():
     # Ensure the relational multi-tenant tables exist (Alembic owns migrations in
@@ -369,6 +383,7 @@ async def _start_scheduler():
     db.init_db()
     asyncio.create_task(_morning_loop())
     asyncio.create_task(_dispatch_loop())
+    asyncio.create_task(_digest_loop())
 
 
 # ---------- Frontend ----------

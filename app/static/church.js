@@ -147,6 +147,7 @@ function renderHome() {
   const defs = [["mine", "My prayers"], ["new", "Request prayer"]];
   if (isElder()) defs.push(["queue", "Elder queue"], ["flock", "My flock"], ["followup", "Follow-up"]);
   if (account.role === "admin" || account.role === "elder") defs.push(["invite", "Invite"]);
+  defs.push(["settings", "Settings"]);
   defs.forEach(([k, label]) => {
     tabs.append(el("button", { class: tab === k ? "active" : "", onclick: () => { tab = k; renderHome(); }, text: label }));
   });
@@ -154,7 +155,7 @@ function renderHome() {
   const body = el("div", {});
   app.append(body);
   ({ mine: viewMine, new: viewNew, queue: viewQueue, flock: viewFlock,
-     followup: viewFollowUp, invite: viewInvite }[tab] || viewMine)(body);
+     followup: viewFollowUp, invite: viewInvite, settings: viewSettings }[tab] || viewMine)(body);
 }
 
 function prayerCard(p, opts = {}) {
@@ -330,6 +331,39 @@ async function renderDetail(pid) {
     try { await fn(); renderDetail(pid); }
     catch (e) { err.textContent = e.detail || "Action failed"; }
   }
+}
+
+async function viewSettings(node) {
+  const card = el("div", { class: "card" }, [el("h2", { text: "Notifications" }), el("p", { class: "muted", text: "Loading…" })]);
+  node.append(card);
+  let prefs;
+  try { prefs = await api("/api/account/prefs"); }
+  catch (e) { clear(card); card.append(el("p", { class: "err", text: e.detail || "Could not load" })); return; }
+  clear(card);
+  const emailCb = el("input", { type: "checkbox" }); emailCb.checked = prefs.email_enabled;
+  const digestCb = el("input", { type: "checkbox" }); digestCb.checked = prefs.digest_weekly;
+  const daySel = el("select", {});
+  ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].forEach((d, i) => {
+    const o = el("option", { value: String(i), text: d });
+    if (i === prefs.digest_day) o.selected = "selected";
+    daySel.append(o);
+  });
+  const err = el("div", { class: "err" });
+  const save = el("button", { text: "Save", onclick: async () => {
+    err.textContent = "";
+    try {
+      await api("/api/account/prefs", "POST", {
+        email_enabled: emailCb.checked, digest_weekly: digestCb.checked, digest_day: Number(daySel.value) });
+      err.textContent = "Saved.";
+    } catch (e) { err.textContent = e.detail || "Could not save"; }
+  } });
+  card.append(
+    el("h2", { text: "Notifications" }),
+    el("label", { class: "row", style: "gap:8px" }, [emailCb, el("span", { text: "Email me about prayers I follow" })]),
+    el("label", { class: "row", style: "gap:8px" }, [digestCb, el("span", { text: "Also send a weekly digest" })]),
+    el("label", { text: "Digest day" }), daySel,
+    el("div", { class: "row", style: "margin-top:12px" }, [save]), err,
+  );
 }
 
 boot();

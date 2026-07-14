@@ -124,6 +124,12 @@ class MuteBody(BaseModel):
     muted: bool = True
 
 
+class PrefsBody(BaseModel):
+    email_enabled: bool | None = None
+    digest_weekly: bool | None = None
+    digest_day: int | None = Field(default=None, ge=0, le=6)
+
+
 # --- churches & accounts -------------------------------------------------
 
 @router.post("/api/churches")
@@ -159,6 +165,18 @@ async def account_logout(response: Response):
 @router.get("/api/account/me")
 async def account_me(acct: dict = Depends(require_account)):
     return acct
+
+
+@router.get("/api/account/prefs")
+async def get_prefs(acct: dict = Depends(require_account)):
+    return accounts.get_prefs(acct["user_id"])
+
+
+@router.post("/api/account/prefs")
+async def set_prefs(body: PrefsBody, acct: dict = Depends(require_account)):
+    return _handle(lambda: accounts.set_prefs(
+        acct["user_id"], email_enabled=body.email_enabled,
+        digest_weekly=body.digest_weekly, digest_day=body.digest_day))
 
 
 @router.post("/api/invites")
