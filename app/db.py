@@ -14,6 +14,7 @@ Route handlers should obtain a ``Tenant`` and never build raw cross-org queries.
 """
 from __future__ import annotations
 
+import logging
 import os
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -40,14 +41,52 @@ def _sqlite_pragmas(dbapi_conn, _record):  # pragma: no cover - trivial
         cur.close()
 
 
-def init_db() -> None:
-    """Create tables if they don't exist. Alembic owns migrations in production;
-    this keeps tests and first-run local dev zero-config."""
+def _ensure_sqlite_dir() -> None:
     if config.DATABASE_URL.startswith("sqlite"):
         path = config.DATABASE_URL.replace("sqlite:///", "", 1)
         if path and path != ":memory:":
             os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+
+
+def init_db() -> None:
+    """Create tables if they don't exist. Used by tests and as a dev fallback."""
+    _ensure_sqlite_dir()
     SQLModel.metadata.create_all(engine)
+
+
+def migrate() -> None:
+    """Bring the database schema up to date (production path).
+
+    Runs Alembic ``upgrade head``. Handles the three real-world cases:
+      * fresh DB -> the initial migration creates every table;
+      * a DB created by an older ``create_all`` (no alembic_version) -> stamp it to
+        head first so the upgrade is a clean no-op;
+      * already current -> no-op.
+    If Alembic isn't available/misconfigured, fall back to ``create_all`` so a dev
+    machine or test never fails to boot — but a genuine migration error is raised.
+    """
+    _ensure_sqlite_dir()
+    try:
+        from pathlib import Path
+
+        from alembic import command
+        from alembic.config import Config
+        from sqlalchemy import inspect
+
+        root = Path(__file__).resolve().parent.parent
+        cfg = Config(str(root / "alembic.ini"))
+        cfg.set_main_option("script_location", str(root / "migrations"))
+        cfg.set_main_option("sqlalchemy.url", config.DATABASE_URL)
+
+        names = inspect(engine).get_table_names()
+        if "organizations" in names and "alembic_version" not in names:
+            command.stamp(cfg, "head")  # legacy create_all DB -> mark as current
+    except Exception:
+        logging.getLogger("prayervault").warning(
+            "Alembic unavailable; falling back to create_all", exc_info=True)
+        SQLModel.metadata.create_all(engine)
+        return
+    command.upgrade(cfg, "head")
 
 
 @contextmanager

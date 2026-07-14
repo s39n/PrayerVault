@@ -378,9 +378,9 @@ async def _digest_loop():
 
 @app.on_event("startup")
 async def _start_scheduler():
-    # Ensure the relational multi-tenant tables exist (Alembic owns migrations in
-    # production; this makes a fresh NAS deploy and local dev zero-config).
-    db.init_db()
+    # Bring the schema up to date via Alembic (falls back to create_all if Alembic
+    # isn't available). Keeps a fresh NAS deploy and local dev zero-config.
+    db.migrate()
     asyncio.create_task(_morning_loop())
     asyncio.create_task(_dispatch_loop())
     asyncio.create_task(_digest_loop())
