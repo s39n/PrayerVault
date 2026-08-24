@@ -707,7 +707,10 @@ async function renderYou() {
       <div class="row" style="margin-top:12px">
         ${APP_CONFIG.google_login ? `<a class="drive-btn" href="/api/backup/drive">Back up to Google Drive</a>` : ""}
         <a class="drive-btn" href="/api/export.zip">Download .zip</a>
+        <label class="drive-btn" style="cursor:pointer">Import .zip<input id="import-file" type="file" accept=".zip,application/zip" style="display:none"></label>
+        ${APP_CONFIG.google_login ? `<a class="drive-btn" href="/api/restore/drive">Restore from Drive</a>` : ""}
       </div>
+      <p class="meta" style="margin-top:8px">Importing never overwrites — a matching prayer is added under a new name.</p>
     </div>`;
   if (!me.admin) {
     $("you-view").innerHTML = `
@@ -716,6 +719,7 @@ async function renderYou() {
         <div class="section-title">Account</div>
         <p class="meta">Signed in with Google${me.email ? " as " + esc(me.email) : ""}. Your prayer journal is private to you.</p>
       </div>` + backupCard;
+    wireImport();
     return;
   }
   let s;
@@ -773,6 +777,7 @@ async function renderYou() {
         <span id="pr-status" class="meta"></span>
       </div>
     </div>` + backupCard;
+  wireImport();
   const gather = () => ({ morning: {
     enabled: $("mp-enabled").checked,
     delivery: $("mp-delivery").value,
@@ -998,6 +1003,37 @@ function toast(msg) {
   setTimeout(() => t.remove(), 5000);
 }
 
+async function doImport(input) {
+  const f = input.files && input.files[0];
+  if (!f) return;
+  const fd = new FormData();
+  fd.append("file", f);
+  try {
+    const r = await fetch("/api/import.zip", { method: "POST", body: fd, credentials: "same-origin" });
+    if (r.status === 401) { show("login-view"); return; }
+    if (!r.ok) {
+      let msg = "Import failed";
+      try { msg = (await r.json()).detail || msg; } catch {}
+      throw new Error(msg);
+    }
+    const res = await r.json();
+    const extra = res.renamed ? `, ${res.renamed} added as a copy` : "";
+    toast(`Imported ${res.imported} prayer${res.imported === 1 ? "" : "s"}${extra}.`);
+  } catch (e) {
+    toast(e.message || "Import failed");
+  } finally {
+    input.value = "";
+  }
+}
+
+function wireImport() {
+  const input = $("import-file");
+  if (input && !input._wired) {
+    input._wired = true;
+    input.addEventListener("change", () => doImport(input));
+  }
+}
+
 let APP_CONFIG = { google_login: false };
 fetch("/api/app-config").then((r) => r.json()).then((c) => {
   APP_CONFIG = c;
@@ -1005,10 +1041,13 @@ fetch("/api/app-config").then((r) => r.json()).then((c) => {
 }).catch(() => {});
 
 const _params = new URLSearchParams(location.search);
-if (_params.has("login") || _params.has("backup")) {
+if (_params.has("login") || _params.has("backup") || _params.has("restore")) {
   if (_params.get("login") === "failed") $("login-error").textContent = "Google sign-in didn't complete. Please try again.";
   if (_params.get("backup") === "ok") toast("Backup saved to your Google Drive.");
   if (_params.get("backup") === "failed") toast("Google Drive backup failed — please try again.");
+  if (_params.get("restore") === "ok") toast(`Restored ${_params.get("imported") || ""} prayer(s) from your Google Drive.`);
+  if (_params.get("restore") === "empty") toast("No backups found in your Google Drive.");
+  if (_params.get("restore") === "failed") toast("Google Drive restore failed — please try again.");
   history.replaceState(null, "", location.pathname);
 }
 

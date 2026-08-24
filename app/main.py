@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import logging
+import zipfile
 from pathlib import Path
 
 from fastapi import (BackgroundTasks, Depends, FastAPI, File, HTTPException,
@@ -142,6 +143,20 @@ async def google_callback(code: str = "", state: str = "", error: str = ""):
             return _html_redirect("/?backup=failed")
         return _html_redirect("/?backup=ok")
 
+    if st.get("p") == "restore" and st.get("u"):
+        try:
+            tokens = await google_auth.exchange_code(code)
+            backups = await google_auth.list_backups(tokens["access_token"])
+            if not backups:
+                return _html_redirect("/?restore=empty")
+            data = await google_auth.download_drive_file(
+                tokens["access_token"], backups[0]["id"])
+            result = notes.import_zip(data, users.vault_for(st["u"]))
+        except Exception:
+            log.exception("Drive restore failed")
+            return _html_redirect("/?restore=failed")
+        return _html_redirect(f"/?restore=ok&imported={result['imported']}")
+
     return _html_redirect("/")
 
 
@@ -152,6 +167,26 @@ async def export_zip(user: str = Depends(auth.require_auth)):
     return Response(data, media_type="application/zip", headers={
         "Content-Disposition": f'attachment; filename="prayervault-{today}.zip"',
         "Cache-Control": "no-cache"})
+
+
+@app.post("/api/import.zip")
+async def import_zip(file: UploadFile = File(...), user: str = Depends(auth.require_auth)):
+    data = await file.read()
+    if not data:
+        raise HTTPException(422, "Empty file")
+    if len(data) > 50 * 1024 * 1024:
+        raise HTTPException(413, "Backup too large (50 MB max)")
+    try:
+        return notes.import_zip(data, users.vault_for(user))
+    except zipfile.BadZipFile:
+        raise HTTPException(422, "That doesn't look like a valid .zip backup")
+
+
+@app.get("/api/restore/drive")
+async def restore_drive(user: str = Depends(auth.require_auth)):
+    if not google_auth.enabled():
+        raise HTTPException(404, "Google Drive restore is not configured")
+    return RedirectResponse(google_auth.auth_url("restore", user))
 
 
 # ---------- Prayers ----------

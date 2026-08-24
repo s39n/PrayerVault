@@ -1,6 +1,8 @@
 """Read/write prayers as Obsidian-flavored Markdown notes in the vault."""
 import datetime
+import io
 import re
+import zipfile
 from pathlib import Path
 
 import yaml
@@ -134,6 +136,51 @@ def list_notes(root: Path | str | None = None) -> list[dict]:
             "preview": (sections.get("Prayer", "")[:160]),
         })
     return out
+
+
+def _import_stem(stem: str) -> str:
+    """Sanitize a filename stem to a safe, URL-usable note id (or '' to skip)."""
+    stem = re.sub(r"[^A-Za-z0-9 _\-',]", "", stem).strip()
+    stem = re.sub(r"\s+", " ", stem)[:120]
+    return stem if stem and ID_RE.match(stem) else ""
+
+
+def import_zip(data: bytes, root: Path | str | None = None) -> dict:
+    """Import prayer notes from a .zip of Markdown files.
+
+    Non-destructive: an incoming note whose id already exists is written under a new
+    name ("<id> imported") so nothing is overwritten. Only files carrying the
+    ``prayer`` tag are imported; anything else is skipped. Filenames are reduced to
+    their basename, guarding against zip-slip path traversal.
+
+    Returns ``{"imported": n, "renamed": n, "skipped": n}``.
+    """
+    imported = renamed = skipped = 0
+    with zipfile.ZipFile(io.BytesIO(data)) as z:
+        for info in z.infolist():
+            if info.is_dir() or not info.filename.lower().endswith(".md"):
+                continue
+            stem = _import_stem(Path(info.filename).name[:-3])  # basename, drop ".md"
+            if not stem:
+                skipped += 1
+                continue
+            content = z.read(info).decode("utf-8", errors="replace")
+            fm, _ = parse_note(content)
+            if "prayer" not in (fm.get("tags") or []):
+                skipped += 1
+                continue
+            target = _safe_path(stem, root)
+            was_renamed = False
+            n = 2
+            while target.exists():
+                alt = f"{stem} imported" if n == 2 else f"{stem} imported {n}"
+                target = _safe_path(_import_stem(alt), root)
+                was_renamed = True
+                n += 1
+            target.write_text(content, encoding="utf-8")
+            imported += 1
+            renamed += 1 if was_renamed else 0
+    return {"imported": imported, "renamed": renamed, "skipped": skipped}
 
 
 def add_update(note_id: str, text: str, root: Path | str | None = None) -> None:

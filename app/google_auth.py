@@ -93,6 +93,34 @@ def zip_vault(root: Path) -> bytes:
     return buf.getvalue()
 
 
+DRIVE_LIST_URL = "https://www.googleapis.com/drive/v3/files"
+
+
+async def list_backups(access_token: str) -> list[dict]:
+    """List the PrayerVault backup zips this app created in the user's Drive,
+    newest first. Works with the drive.file scope (app-created files only)."""
+    params = {
+        "q": ("name contains 'PrayerVault Backup' and "
+              "mimeType='application/zip' and trashed=false"),
+        "orderBy": "modifiedTime desc",
+        "fields": "files(id,name,modifiedTime)",
+        "pageSize": 25,
+    }
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.get(DRIVE_LIST_URL, params=params,
+                             headers={"Authorization": f"Bearer {access_token}"})
+        r.raise_for_status()
+        return r.json().get("files", [])
+
+
+async def download_drive_file(access_token: str, file_id: str) -> bytes:
+    async with httpx.AsyncClient(timeout=120) as client:
+        r = await client.get(f"{DRIVE_LIST_URL}/{file_id}", params={"alt": "media"},
+                             headers={"Authorization": f"Bearer {access_token}"})
+        r.raise_for_status()
+        return r.content
+
+
 async def upload_to_drive(access_token: str, data: bytes) -> None:
     """Upload the zip as a new file in the user's own Drive (multipart/related)."""
     name = f"PrayerVault Backup {datetime.date.today().isoformat()}.zip"

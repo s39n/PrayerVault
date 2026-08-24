@@ -266,6 +266,46 @@ def test_per_user_isolation_and_admin_gate(monkeypatch):
     assert not any("Friend prayer" in i for i in ids)
 
 
+def _make_zip(name, content):
+    import io
+    import zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr(name, content)
+    return buf.getvalue()
+
+
+PRAYER_MD = ("---\ntitle: Backup Note\ndate: '2026-01-01'\ntype: prayer\n"
+             "status: ongoing\nai: done\ntags: [prayer, prayer/personal]\n---\n\n"
+             "## Prayer\n\nRestore me.\n")
+
+
+def test_import_new_then_keep_both():
+    _login()
+    z = _make_zip("2026-01-01 Backup Note.md", PRAYER_MD)
+    r1 = client.post("/api/import.zip", files={"file": ("b.zip", z, "application/zip")}).json()
+    assert r1["imported"] == 1 and r1["renamed"] == 0
+    # second import of the same note is non-destructive -> kept under a new name
+    r2 = client.post("/api/import.zip", files={"file": ("b.zip", z, "application/zip")}).json()
+    assert r2["imported"] == 1 and r2["renamed"] == 1
+    ids = {p["id"] for p in client.get("/api/prayers").json()}
+    assert "2026-01-01 Backup Note" in ids
+    assert any(i.startswith("2026-01-01 Backup Note imported") for i in ids)
+
+
+def test_import_skips_non_prayer_files():
+    _login()
+    z = _make_zip("random.md", "---\ntitle: X\ntags: [notes]\n---\n\n## Body\n\nx\n")
+    r = client.post("/api/import.zip", files={"file": ("b.zip", z, "application/zip")}).json()
+    assert r["imported"] == 0 and r["skipped"] >= 1
+
+
+def test_import_rejects_bad_zip():
+    _login()
+    r = client.post("/api/import.zip", files={"file": ("x.zip", b"not a zip", "application/zip")})
+    assert r.status_code == 422
+
+
 def test_export_zip():
     import io
     import zipfile
