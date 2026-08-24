@@ -50,3 +50,24 @@ def test_missing_model_raises_clear_error(monkeypatch):
         asyncio.run(ollama_client._chat([{"role": "user", "content": "hi"}]))
     msg = str(exc.value).lower()
     assert "not found" in msg and "ollama_model" in msg
+
+
+class _ClientTimeout:
+    def __init__(self, *a, **k):
+        pass
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *a):
+        return False
+
+    async def post(self, url, json=None):
+        raise httpx.ReadTimeout("timed out")
+
+
+def test_slow_model_raises_clear_timeout_error(monkeypatch):
+    monkeypatch.setattr(ollama_client.httpx, "AsyncClient", _ClientTimeout)
+    with pytest.raises(OllamaError) as exc:
+        asyncio.run(ollama_client._chat([{"role": "user", "content": "hi"}]))
+    assert "didn't respond" in str(exc.value).lower()

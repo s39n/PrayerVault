@@ -100,7 +100,14 @@ async def _chat(messages: list[dict]) -> str:
         "messages": messages,
     }
     async with httpx.AsyncClient(timeout=config.OLLAMA_TIMEOUT) as client:
-        r = await client.post(f"{config.OLLAMA_URL}/api/chat", json=payload)
+        try:
+            r = await client.post(f"{config.OLLAMA_URL}/api/chat", json=payload)
+        except httpx.TimeoutException as e:
+            raise OllamaError(
+                f"Ollama model '{config.OLLAMA_MODEL}' didn't respond within "
+                f"{config.OLLAMA_TIMEOUT}s. It may be too large/slow for the host — try a "
+                f"smaller, non-'thinking' model (e.g. qwen2.5:7b), or raise OLLAMA_TIMEOUT."
+            ) from e
         if r.status_code == 404:
             raise OllamaError(
                 f"Model '{config.OLLAMA_MODEL}' was not found on the Ollama server at "
