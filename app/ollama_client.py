@@ -6,6 +6,10 @@ import httpx
 
 from . import config, settings
 
+
+class OllamaError(RuntimeError):
+    """A problem talking to Ollama (unreachable, model missing, or bad output)."""
+
 SYSTEM_PROMPT = """You are a pastoral assistant grounded in Reformed (Presbyterian) theology,
 consistent with the Westminster Standards. You will be given a personal prayer or a prayer
 request. Respond ONLY with a JSON object with these keys:
@@ -86,48 +90,63 @@ def _shape(raw: dict) -> dict:
     }
 
 
+async def _chat(messages: list[dict]) -> str:
+    """POST to Ollama's /api/chat and return the reply content, with clear errors."""
+    payload = {
+        "model": config.OLLAMA_MODEL,
+        "stream": False,
+        "format": "json",
+        "options": {"temperature": 0.6},
+        "messages": messages,
+    }
+    async with httpx.AsyncClient(timeout=config.OLLAMA_TIMEOUT) as client:
+        r = await client.post(f"{config.OLLAMA_URL}/api/chat", json=payload)
+        if r.status_code == 404:
+            raise OllamaError(
+                f"Model '{config.OLLAMA_MODEL}' was not found on the Ollama server at "
+                f"{config.OLLAMA_URL}. Pull it with `ollama pull {config.OLLAMA_MODEL}`, "
+                f"or set OLLAMA_MODEL to a model that server already has."
+            )
+        r.raise_for_status()
+        return r.json()["message"]["content"]
+
+
+def _parse_json(content: str) -> dict:
+    """Extract a JSON object from the reply, tolerating code fences and reasoning
+    models that prepend a <think>...</think> block before the JSON."""
+    content = content.strip()
+    content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
+    content = re.sub(r"^```(json)?|```$", "", content, flags=re.MULTILINE).strip()
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        match = re.search(r"\{.*\}", content, flags=re.DOTALL)  # first {...} object
+        if match:
+            return json.loads(match.group(0))
+        raise OllamaError(
+            "The model did not return valid JSON. Try a different OLLAMA_MODEL "
+            "(a non-'thinking' model such as qwen2.5 is most reliable here)."
+        )
+
+
 async def generate(kind: str, title: str, text: str, requested_by: str = "") -> dict:
     who = f" (requested by {requested_by})" if requested_by else ""
     label = "prayer request" if kind == "request" else "personal prayer"
     user_msg = f"This is a {label}{who}, titled \"{title}\":\n\n{text}"
-    payload = {
-        "model": config.OLLAMA_MODEL,
-        "stream": False,
-        "format": "json",
-        "options": {"temperature": 0.6},
-        "messages": [
-            {"role": "system", "content": _prompt("system", SYSTEM_PROMPT)},
-            {"role": "user", "content": user_msg},
-        ],
-    }
-    async with httpx.AsyncClient(timeout=config.OLLAMA_TIMEOUT) as client:
-        r = await client.post(f"{config.OLLAMA_URL}/api/chat", json=payload)
-        r.raise_for_status()
-        content = r.json()["message"]["content"]
-    # Some models wrap JSON in code fences despite format=json
-    content = re.sub(r"^```(json)?|```$", "", content.strip(), flags=re.MULTILINE).strip()
-    raw = json.loads(content)
-    return _shape(raw)
+    content = await _chat([
+        {"role": "system", "content": _prompt("system", SYSTEM_PROMPT)},
+        {"role": "user", "content": user_msg},
+    ])
+    return _shape(_parse_json(content))
 
 
 async def ask(question: str) -> dict:
     """Answer a free-form question with Scripture references + a Reformed reflection."""
-    payload = {
-        "model": config.OLLAMA_MODEL,
-        "stream": False,
-        "format": "json",
-        "options": {"temperature": 0.6},
-        "messages": [
-            {"role": "system", "content": _prompt("answer", ANSWER_PROMPT)},
-            {"role": "user", "content": question.strip()},
-        ],
-    }
-    async with httpx.AsyncClient(timeout=config.OLLAMA_TIMEOUT) as client:
-        r = await client.post(f"{config.OLLAMA_URL}/api/chat", json=payload)
-        r.raise_for_status()
-        content = r.json()["message"]["content"]
-    content = re.sub(r"^```(json)?|```$", "", content.strip(), flags=re.MULTILINE).strip()
-    raw = json.loads(content)
+    content = await _chat([
+        {"role": "system", "content": _prompt("answer", ANSWER_PROMPT)},
+        {"role": "user", "content": question.strip()},
+    ])
+    raw = _parse_json(content)
     return {"scripture_md": _shape(raw)["scripture_md"], "answer": str(raw.get("answer", "")).strip()}
 
 
