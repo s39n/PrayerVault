@@ -357,13 +357,48 @@ async function viewSettings(node) {
       err.textContent = "Saved.";
     } catch (e) { err.textContent = e.detail || "Could not save"; }
   } });
+  const pushStatus = el("div", { class: "muted" });
+  const pushBtn = el("button", { class: "ghost", text: "Enable push on this device",
+    onclick: () => enablePush(pushStatus) });
   card.append(
     el("h2", { text: "Notifications" }),
     el("label", { class: "row", style: "gap:8px" }, [emailCb, el("span", { text: "Email me about prayers I follow" })]),
     el("label", { class: "row", style: "gap:8px" }, [digestCb, el("span", { text: "Also send a weekly digest" })]),
     el("label", { text: "Digest day" }), daySel,
     el("div", { class: "row", style: "margin-top:12px" }, [save]), err,
+    el("h3", { text: "Browser notifications" }),
+    el("p", { class: "muted", text: "Get a push on this device when prayers you follow are updated." }),
+    el("div", { class: "row" }, [pushBtn]), pushStatus,
   );
+}
+
+function urlB64ToUint8Array(b64) {
+  const pad = "=".repeat((4 - (b64.length % 4)) % 4);
+  const base = (b64 + pad).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(base);
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+}
+
+async function enablePush(statusEl) {
+  statusEl.textContent = "";
+  try {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      statusEl.textContent = "This browser doesn't support push notifications."; return;
+    }
+    const info = await api("/api/push/key");
+    if (!info.enabled || !info.key) {
+      statusEl.textContent = "Push isn't configured on the server yet."; return;
+    }
+    const reg = await navigator.serviceWorker.register("/church-sw.js", { scope: "/church" });
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") { statusEl.textContent = "Notification permission was denied."; return; }
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true, applicationServerKey: urlB64ToUint8Array(info.key) });
+    await api("/api/push/subscribe", "POST", { subscription: sub.toJSON() });
+    statusEl.textContent = "Push enabled on this device.";
+  } catch (e) {
+    statusEl.textContent = (e && e.detail) || "Could not enable push here.";
+  }
 }
 
 boot();

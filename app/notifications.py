@@ -21,7 +21,7 @@ from email.message import EmailMessage
 
 from sqlmodel import select
 
-from . import config, db, models
+from . import config, db, models, webpush
 
 log = logging.getLogger("prayervault.notify")
 
@@ -87,7 +87,9 @@ def _channels_for(prefs: models.NotificationPref | None) -> list[str]:
     channels = []
     if prefs.email_enabled:
         channels.append("email")
-    # Future: ntfy / webpush / sms gated on their prefs + config.
+    if prefs.webpush_enabled and prefs.webpush_subscription and webpush.available():
+        channels.append("webpush")
+    # Future: ntfy / sms gated on their prefs + config.
     return channels
 
 
@@ -192,6 +194,18 @@ def _deliver(s, n: models.Notification) -> None:
         if not to:
             raise RuntimeError("no email address for user")
         send_email(to, subject, body)
+    elif n.channel == "webpush":
+        prefs = s.get(models.NotificationPref, n.user_id)
+        sub = prefs.webpush_subscription if prefs else None
+        if not sub:
+            raise RuntimeError("no push subscription")
+        try:
+            webpush.send(sub, subject, body)
+        except webpush.PushGone:
+            # Subscription is dead — drop it and treat the send as handled.
+            prefs.webpush_subscription = None
+            prefs.webpush_enabled = False
+            s.add(prefs)
     else:
         raise RuntimeError(f"channel {n.channel} not deliverable yet")
 

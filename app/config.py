@@ -45,6 +45,20 @@ DATABASE_URL = os.environ.get(
     "DATABASE_URL", "sqlite:///" + os.path.join(DATA_DIR, "prayervault.db")
 )
 
+# --- Email notifications (optional; disabled until SMTP_HOST is set) ---
+SMTP_HOST = os.environ.get("SMTP_HOST", "")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USER = os.environ.get("SMTP_USER", "")
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
+SMTP_STARTTLS = os.environ.get("SMTP_STARTTLS", "true").lower() == "true"
+MAIL_FROM = os.environ.get("MAIL_FROM", "PrayerVault <no-reply@prayervault.local>")
+
+# --- Web push (VAPID; optional, disabled until keys are set). Generate with
+#     python scripts/gen_vapid.py ---
+VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
+VAPID_SUBJECT = os.environ.get("VAPID_SUBJECT", "mailto:admin@prayervault.local")
+
 if not SESSION_SECRET:
     raise RuntimeError("SESSION_SECRET is not set. See .env.example.")
 if not AUTH_PASSWORD_HASH:

@@ -20,7 +20,7 @@ from fastapi.responses import FileResponse
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from pydantic import BaseModel, Field
 
-from . import accounts, config, notifications, orgs, prayer_service as ps
+from . import accounts, config, notifications, orgs, prayer_service as ps, webpush
 from .accounts import AccountError
 from .orgs import OrgError
 from .prayer_service import PermissionDenied, PrayerError
@@ -130,6 +130,10 @@ class PrefsBody(BaseModel):
     digest_day: int | None = Field(default=None, ge=0, le=6)
 
 
+class PushSub(BaseModel):
+    subscription: dict
+
+
 # --- churches & accounts -------------------------------------------------
 
 @router.post("/api/churches")
@@ -177,6 +181,23 @@ async def set_prefs(body: PrefsBody, acct: dict = Depends(require_account)):
     return _handle(lambda: accounts.set_prefs(
         acct["user_id"], email_enabled=body.email_enabled,
         digest_weekly=body.digest_weekly, digest_day=body.digest_day))
+
+
+@router.get("/api/push/key")
+async def push_key(acct: dict = Depends(require_account)):
+    return {"enabled": webpush.available(), "key": webpush.public_key()}
+
+
+@router.post("/api/push/subscribe")
+async def push_subscribe(body: PushSub, acct: dict = Depends(require_account)):
+    webpush.save_subscription(acct["user_id"], body.subscription)
+    return {"ok": True}
+
+
+@router.post("/api/push/unsubscribe")
+async def push_unsubscribe(acct: dict = Depends(require_account)):
+    webpush.clear_subscription(acct["user_id"])
+    return {"ok": True}
 
 
 @router.post("/api/invites")
@@ -305,3 +326,10 @@ async def church_page():
 async def church_js():
     return FileResponse(STATIC / "church.js", media_type="application/javascript",
                         headers={"Cache-Control": "no-cache"})
+
+
+@router.get("/church-sw.js")
+async def church_sw():
+    # Service-Worker-Allowed lets a root-served worker take the /church scope.
+    return FileResponse(STATIC / "church-sw.js", media_type="application/javascript",
+                        headers={"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"})

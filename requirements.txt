@@ -7,3 +7,4 @@ python-multipart==0.0.20
 PyYAML==6.0.2
 sqlmodel==0.0.22
 alembic==1.14.0
+pywebpush==2.0.0

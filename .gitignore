@@ -8,3 +8,6 @@ caddy_data/
 caddy_config/
 *.png
 users/
+.venv/
+data/
+graphify-out/

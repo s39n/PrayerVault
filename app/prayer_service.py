@@ -16,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlmodel import select
 
-from . import db, models
+from . import db, models, notifications
 
 ELDER_ROLES = ("elder", "admin")
 
@@ -83,7 +83,9 @@ def create_elder_request(org_id: str, requester_id: str, title: str, body: str,
         t.add(models.PrayerUpdate(prayer_id=p.id, author_id=requester_id,
                                   text="Prayer requested", kind="created"))
         _subscribe(t, p.id, requester_id)
-        return p.id
+        pid = p.id
+    notifications.notify_event(org_id, "prayer.created", pid, requester_id)
+    return pid
 
 
 # --- elder: queue + claim ------------------------------------------------
@@ -118,6 +120,7 @@ def claim(org_id: str, prayer_id: str, elder_id: str) -> None:
         _subscribe(t, prayer_id, elder_id)
         t.add(models.PrayerUpdate(prayer_id=prayer_id, author_id=elder_id,
                                   text="An elder is now praying for this", kind="update"))
+    notifications.notify_event(org_id, "prayer.claimed", prayer_id, elder_id)
 
 
 def assign(org_id: str, prayer_id: str, actor_id: str, to_elder_id: str) -> None:
@@ -162,6 +165,7 @@ def add_update(org_id: str, prayer_id: str, author_id: str, text: str) -> None:
         p.updated_at = _now()
         t.add(p)
         _subscribe(t, prayer_id, author_id)
+    notifications.notify_event(org_id, "prayer.update", prayer_id, author_id)
 
 
 def set_status(org_id: str, prayer_id: str, actor_id: str, answered: bool,
@@ -180,6 +184,8 @@ def set_status(org_id: str, prayer_id: str, actor_id: str, answered: bool,
         note = ("Answered!" if answered else "Reopened") + (f" {text.strip()}" if text.strip() else "")
         t.add(models.PrayerUpdate(prayer_id=prayer_id, author_id=actor_id, text=note,
                                   kind="answered" if answered else "reopened"))
+    notifications.notify_event(
+        org_id, "prayer.answered" if answered else "prayer.update", prayer_id, actor_id)
 
 
 def timeline(org_id: str, prayer_id: str, viewer_id: str) -> list[dict]:
