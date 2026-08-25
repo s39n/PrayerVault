@@ -306,6 +306,51 @@ def test_import_rejects_bad_zip():
     assert r.status_code == 422
 
 
+def test_families_group_prayers_and_keep_answered(monkeypatch):
+    async def fake_generate(*a, **k):
+        return None
+    monkeypatch.setattr(ollama_client, "generate", fake_generate)
+    _login()
+    fam = client.post("/api/families", json={"name": "The Smiths"}).json()
+    assert fam["id"] == "the-smiths"
+    nid = client.post("/api/prayers", json={
+        "type": "request", "title": "Smith job", "text": "pray",
+        "family": "the-smiths"}).json()["id"]
+    by_id = {f["id"]: f for f in client.get("/api/families").json()}
+    assert by_id["the-smiths"]["ongoing"] == 1 and by_id["the-smiths"]["answered"] == 0
+    detail = client.get("/api/families/the-smiths").json()
+    assert [p["id"] for p in detail["prayers"]] == [nid]
+    # Answering keeps it under the family, now counted as fruit
+    client.post(f"/api/prayers/{nid}/answered", json={"text": "praise God"})
+    by_id = {f["id"]: f for f in client.get("/api/families").json()}
+    assert by_id["the-smiths"]["answered"] == 1 and by_id["the-smiths"]["ongoing"] == 0
+    assert client.get("/api/families/the-smiths").json()["prayers"][0]["status"] == "answered"
+
+
+def test_family_assign_reassign_and_validation(monkeypatch):
+    async def fake_generate(*a, **k):
+        return None
+    monkeypatch.setattr(ollama_client, "generate", fake_generate)
+    _login()
+    nid = client.post("/api/prayers", json={"type": "prayer", "title": "Unfiled",
+                                            "text": "x"}).json()["id"]
+    # Unknown family rejected on create and on assign
+    assert client.post("/api/prayers", json={"type": "prayer", "title": "x", "text": "y",
+                                             "family": "nope"}).status_code == 422
+    assert client.post(f"/api/prayers/{nid}/family", json={"family": "nope"}).status_code == 422
+    client.post("/api/families", json={"name": "Jones"})
+    assert client.post(f"/api/prayers/{nid}/family", json={"family": "jones"}).json()["ok"]
+    assert any(p["id"] == nid for p in client.get("/api/families/jones").json()["prayers"])
+    # Clearing the family unfiles it
+    client.post(f"/api/prayers/{nid}/family", json={"family": ""})
+    assert not any(p["id"] == nid for p in client.get("/api/families/jones").json()["prayers"])
+
+
+def test_family_missing_is_404():
+    _login()
+    assert client.get("/api/families/does-not-exist").status_code == 404
+
+
 def test_export_zip():
     import io
     import zipfile

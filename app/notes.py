@@ -74,7 +74,7 @@ def render_note(fm: dict, sections: dict[str, str]) -> str:
 
 
 def create_note(kind: str, title: str, text: str, requested_by: str = "",
-                root: Path | str | None = None) -> str:
+                family: str = "", root: Path | str | None = None) -> str:
     today = datetime.date.today().isoformat()
     slug = slugify(title)
     note_id = f"{today} {slug}"
@@ -94,6 +94,8 @@ def create_note(kind: str, title: str, text: str, requested_by: str = "",
     }
     if requested_by:
         fm["requested-by"] = requested_by
+    if family:
+        fm["family"] = family
     sections = {
         "Prayer": text.strip(),
         "Updates": f"- {today} — Created",
@@ -132,10 +134,22 @@ def list_notes(root: Path | str | None = None) -> list[dict]:
             "status": fm.get("status", "ongoing"),
             "ai": fm.get("ai", "done"),
             "requested_by": fm.get("requested-by", ""),
+            "family": fm.get("family", ""),
             "answered_date": str(fm.get("answered-date", "")),
             "preview": (sections.get("Prayer", "")[:160]),
         })
     return out
+
+
+def set_family(note_id: str, family_id: str, root: Path | str | None = None) -> None:
+    """Attach the note to a family (or clear it when family_id is empty)."""
+    note = read_note(note_id, root)
+    fm = note["frontmatter"]
+    if family_id:
+        fm["family"] = family_id
+    else:
+        fm.pop("family", None)
+    write_note(note_id, fm, note["sections"], root)
 
 
 def _import_stem(stem: str) -> str:

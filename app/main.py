@@ -10,7 +10,7 @@ from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse,
                                RedirectResponse)
 from pydantic import BaseModel, Field
 
-from . import (auth, config, db, embeddings, google_auth, notes, notify,
+from . import (auth, config, db, embeddings, families, google_auth, notes, notify,
                notifications, ollama_client, settings, stt, users)
 from .church_api import router as church_router
 
@@ -196,6 +196,7 @@ class NewPrayer(BaseModel):
     title: str = Field(min_length=1, max_length=120)
     text: str = Field(min_length=1, max_length=20000)
     requested_by: str = Field(default="", max_length=120)
+    family: str = Field(default="", max_length=60)
 
 
 class TextBody(BaseModel):
@@ -227,8 +228,11 @@ async def create_prayer(body: NewPrayer, bg: BackgroundTasks,
                         user: str = Depends(auth.require_auth)):
     auth.check_ai_limit(user)
     root = users.vault_for(user)
+    family = body.family.strip()
+    if family and not families.get_family(family, root):
+        raise HTTPException(422, "Unknown family")
     note_id = notes.create_note(body.type, body.title, body.text, body.requested_by,
-                                root=root)
+                                family=family, root=root)
     bg.add_task(_run_ai, note_id, body.type, body.title, body.text, body.requested_by,
                 root)
     return {"id": note_id}
@@ -285,6 +289,70 @@ async def regenerate(note_id: str, bg: BackgroundTasks,
     notes.write_note(note_id, fm, sections, root=root)
     bg.add_task(_run_ai, note_id, fm.get("type", "prayer"), fm.get("title", note_id),
                 sections.get("Prayer", ""), fm.get("requested-by", ""), root)
+    return {"ok": True}
+
+
+# ---------- People & Families ----------
+
+class NewFamily(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+
+
+class FamilyAssign(BaseModel):
+    family: str = Field(default="", max_length=60)
+
+
+@app.get("/api/families")
+async def list_families(user: str = Depends(auth.require_auth)):
+    root = users.vault_for(user)
+    counts: dict[str, dict] = {}
+    for item in notes.list_notes(root):
+        fid = item.get("family")
+        if not fid:
+            continue
+        c = counts.setdefault(fid, {"ongoing": 0, "answered": 0})
+        c["answered" if item["status"] == "answered" else "ongoing"] += 1
+    return [{**f, **counts.get(f["id"], {"ongoing": 0, "answered": 0})}
+            for f in families.list_families(root)]
+
+
+@app.post("/api/families")
+async def create_family(body: NewFamily, user: str = Depends(auth.require_auth)):
+    try:
+        return families.create_family(body.name, users.vault_for(user))
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+
+@app.get("/api/families/{family_id}")
+async def get_family(family_id: str, user: str = Depends(auth.require_auth)):
+    if not families.SLUG_RE.match(family_id):
+        raise HTTPException(404, "Not found")
+    root = users.vault_for(user)
+    fam = families.get_family(family_id, root)
+    if fam is None:
+        raise HTTPException(404, "Not found")
+    prayers = [i for i in notes.list_notes(root) if i.get("family") == family_id]
+    return {"family": fam, "prayers": prayers}
+
+
+@app.delete("/api/families/{family_id}")
+async def delete_family(family_id: str, user: str = Depends(auth.require_auth)):
+    if not families.SLUG_RE.match(family_id):
+        raise HTTPException(404, "Not found")
+    families.delete_family(family_id, users.vault_for(user))
+    return {"ok": True}
+
+
+@app.post("/api/prayers/{note_id}/family")
+async def assign_family(note_id: str, body: FamilyAssign,
+                        user: str = Depends(auth.require_auth)):
+    root = users.vault_for(user)
+    _get_or_404(note_id, root)
+    fam = body.family.strip()
+    if fam and not families.get_family(fam, root):
+        raise HTTPException(422, "Unknown family")
+    notes.set_family(note_id, fam, root=root)
     return {"ok": True}
 
 
