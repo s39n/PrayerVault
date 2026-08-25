@@ -1,6 +1,6 @@
 "use strict";
 const $ = (id) => document.getElementById(id);
-const views = ["login-view", "today-view", "list-view", "fruit-view", "ask-view", "dictate-view", "you-view", "detail-view", "new-view"];
+const views = ["login-view", "today-view", "list-view", "people-view", "fruit-view", "ask-view", "dictate-view", "you-view", "detail-view", "new-view"];
 let filterStatus = "ongoing";
 let pollTimer = null;
 
@@ -863,8 +863,19 @@ async function renderDetail(id) {
         <button id="btn-update">Add update</button>
         ${fm.ai !== "pending" ? '<button id="btn-regen">Regenerate response</button>' : ""}
       </div>
+      <div class="row" style="margin-top:12px;align-items:center;gap:8px">
+        <span class="eyebrow">File under</span>
+        <select id="detail-family" style="flex:1;max-width:280px"><option value="">— none —</option></select>
+      </div>
     </div>`;
   $("btn-back").addEventListener("click", renderList);
+  loadFamilyOptions("detail-family", fm.family);
+  $("detail-family").addEventListener("change", async (e) => {
+    try {
+      await api(`/api/prayers/${encodeURIComponent(id)}/family`, { method: "POST", body: JSON.stringify({ family: e.target.value }) });
+      toast("Filed.");
+    } catch (err) { toast(err.message); }
+  });
   $("detail-view").querySelectorAll(".rel-link").forEach((a) =>
     a.addEventListener("click", () => renderDetail(a.dataset.id)));
   const btnA = $("btn-answered"), btnR = $("btn-reopen"), btnU = $("btn-update"), btnG = $("btn-regen");
@@ -909,6 +920,11 @@ function renderNew(initialText = "") {
         <option value="request">Prayer request (for someone else)</option>
       </select>
       <div id="np-who-wrap" class="hidden"><label>Requested by / for</label><input id="np-who" placeholder="e.g. The Johnson family"></div>
+      <label>File under (person or family)</label>
+      <div class="row">
+        <select id="np-family" style="flex:1"><option value="">— none —</option></select>
+        <button id="np-family-new" type="button">+ New</button>
+      </div>
       <label>Title</label><input id="np-title" placeholder="A few words, e.g. Wisdom for a hard decision">
       <div class="row" style="justify-content:space-between;align-items:flex-end">
         <label style="margin-bottom:4px">Prayer</label>
@@ -921,6 +937,15 @@ function renderNew(initialText = "") {
   $("btn-back2").addEventListener("click", renderList);
   $("np-type").addEventListener("change", (e) =>
     $("np-who-wrap").classList.toggle("hidden", e.target.value !== "request"));
+  loadFamilyOptions("np-family");
+  $("np-family-new").addEventListener("click", async () => {
+    const name = prompt("New person or family name:");
+    if (!name || !name.trim()) return;
+    try {
+      const f = await api("/api/families", { method: "POST", body: JSON.stringify({ name: name.trim() }) });
+      await loadFamilyOptions("np-family", f.id);
+    } catch (e) { $("np-error").textContent = e.message; }
+  });
   let rec = null, chunks = [];
   const micBtn = $("np-mic");
   micBtn.addEventListener("click", async () => {
@@ -961,9 +986,105 @@ function renderNew(initialText = "") {
       const res = await api("/api/prayers", { method: "POST", body: JSON.stringify({
         type: $("np-type").value, title: $("np-title").value.trim(),
         text: $("np-text").value.trim(), requested_by: $("np-who").value.trim(),
+        family: $("np-family").value,
       })});
       renderDetail(res.id);
     } catch (e) { $("np-error").textContent = e.message; }
+  });
+}
+
+// ---------- People & Families ----------
+async function loadFamilyOptions(selectId, selected) {
+  try {
+    const fams = await api("/api/families");
+    const sel = $(selectId);
+    if (!sel) return;
+    sel.innerHTML = '<option value="">— none —</option>' +
+      fams.map((f) => `<option value="${esc(f.id)}">${esc(f.name)}</option>`).join("");
+    if (selected) sel.value = selected;
+  } catch (e) { /* leave the default option */ }
+}
+
+async function renderPeople() {
+  show("people-view");
+  $("people-view").innerHTML = `
+    <div class="greeting"><span class="eyebrow">Prayer for</span><h2>People &amp; Families</h2></div>
+    <div class="card">
+      <div class="row">
+        <input id="fam-name" placeholder="Add a person or family, e.g. The Smiths" style="flex:1">
+        <button class="primary" id="fam-add">Add</button>
+      </div>
+      <div class="error-msg" id="fam-error"></div>
+    </div>
+    <div id="fam-list"><p class="meta" style="text-align:center">Loading…</p></div>`;
+  $("fam-add").addEventListener("click", async () => {
+    const name = $("fam-name").value.trim();
+    if (!name) return;
+    try {
+      await api("/api/families", { method: "POST", body: JSON.stringify({ name }) });
+      $("fam-name").value = "";
+      loadFamilies();
+    } catch (e) { $("fam-error").textContent = e.message; }
+  });
+  $("fam-name").addEventListener("keydown", (e) => { if (e.key === "Enter") $("fam-add").click(); });
+  loadFamilies();
+}
+
+async function loadFamilies() {
+  const wrap = $("fam-list");
+  try {
+    const fams = await api("/api/families");
+    if (!fams.length) {
+      wrap.innerHTML = `<p class="meta" style="text-align:center">No people or families yet. Add one above, then file prayers under them.</p>`;
+      return;
+    }
+    wrap.innerHTML = fams.map((f) => `
+      <div class="card clickable fam-card" data-id="${esc(f.id)}">
+        <div class="row" style="justify-content:space-between">
+          <h3 style="margin:0;font-weight:normal">${esc(f.name)}</h3>
+          <span class="meta">${f.ongoing} ongoing · ${f.answered} answered</span>
+        </div>
+      </div>`).join("");
+    wrap.querySelectorAll(".fam-card").forEach((c) =>
+      c.addEventListener("click", () => renderFamily(c.dataset.id)));
+  } catch (e) { wrap.innerHTML = `<p class="meta">${esc(e.message)}</p>`; }
+}
+
+async function renderFamily(id) {
+  show("people-view");
+  $("people-view").innerHTML = `<p class="meta" style="text-align:center">Loading…</p>`;
+  let data;
+  try { data = await api("/api/families/" + encodeURIComponent(id)); }
+  catch (e) {
+    $("people-view").innerHTML = `<button class="link" id="fam-back">&larr; People</button><p class="meta">${esc(e.message)}</p>`;
+    $("fam-back").addEventListener("click", renderPeople);
+    return;
+  }
+  const ongoing = data.prayers.filter((p) => p.status !== "answered");
+  const answered = data.prayers.filter((p) => p.status === "answered");
+  const card = (p) => `
+    <div class="card clickable prayer-link" data-id="${esc(p.id)}">
+      <div class="row" style="justify-content:space-between">
+        <strong style="font-weight:normal">${esc(p.title)}</strong>
+        <span class="badge ${esc(p.status)}">${esc(p.status)}</span>
+      </div>
+      <div class="meta">${esc(p.date)}${p.preview ? " · " + esc(p.preview.slice(0, 80)) : ""}</div>
+    </div>`;
+  $("people-view").innerHTML = `
+    <button class="link" id="fam-back">&larr; People</button>
+    <div class="greeting"><span class="eyebrow">Prayer for</span><h2>${esc(data.family.name)}</h2></div>
+    <div class="section-title">Ongoing</div>
+    ${ongoing.length ? ongoing.map(card).join("") : '<p class="meta">Nothing ongoing right now.</p>'}
+    <div class="section-title">Fruit — answered prayers</div>
+    ${answered.length ? answered.map(card).join("") : '<p class="meta">No answered prayers yet. Keep praying.</p>'}
+    <div class="row" style="margin-top:18px"><button class="link" id="fam-delete">Remove this family</button></div>`;
+  $("fam-back").addEventListener("click", renderPeople);
+  $("people-view").querySelectorAll(".prayer-link").forEach((c) =>
+    c.addEventListener("click", () => renderDetail(c.dataset.id)));
+  $("fam-delete").addEventListener("click", async () => {
+    if (!confirm("Remove this family? Prayers stay in your journal but become unfiled.")) return;
+    try { await api("/api/families/" + encodeURIComponent(id), { method: "DELETE" }); renderPeople(); }
+    catch (e) { toast(e.message); }
   });
 }
 
@@ -988,6 +1109,7 @@ document.querySelectorAll(".nav-item").forEach((b) =>
   b.addEventListener("click", () => {
     const n = b.dataset.nav;
     if (n === "today") renderToday();
+    else if (n === "people") renderPeople();
     else if (n === "fruit") renderFruit();
     else if (n === "ask") renderAsk();
     else if (n === "dictate") renderDictate();
