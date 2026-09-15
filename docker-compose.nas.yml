@@ -38,6 +38,11 @@ services:
       - SESSION_SECRET=${SESSION_SECRET:?generate with python -c "import secrets; print(secrets.token_hex(32))"}
       - OLLAMA_URL=${OLLAMA_URL:-http://ollama:11434}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma3:12b}
+      # Reasoning model support: OLLAMA_THINK=true for qwen3 etc.; cap context so a
+      # model that fits VRAM stays fully on GPU; raise timeout for slower hosts.
+      - OLLAMA_THINK=${OLLAMA_THINK:-false}
+      - OLLAMA_NUM_CTX=${OLLAMA_NUM_CTX:-8192}
+      - OLLAMA_TIMEOUT=${OLLAMA_TIMEOUT:-300}
       - EMBED_MODEL=${EMBED_MODEL:-nomic-embed-text:latest}
       - WHISPER_URL=http://whisper:9000
       - NTFY_SERVER=${NTFY_SERVER:-https://ntfy.salife.us}
