@@ -23,6 +23,14 @@ NTFY_SERVER = os.environ.get("NTFY_SERVER", "https://ntfy.sh")
 SETTINGS_FILE = os.environ.get("SETTINGS_FILE", "")
 SESSION_MAX_AGE = int(os.environ.get("SESSION_MAX_AGE", str(60 * 60 * 24 * 14)))
 OLLAMA_TIMEOUT = int(os.environ.get("OLLAMA_TIMEOUT", "300"))
+# Enable Ollama's native reasoning for "thinking" models (e.g. qwen3). The model
+# reasons in a separate `thinking` field; we keep the JSON `content`. Only turn on
+# with a model that supports it — non-thinking models reject the `think` flag.
+OLLAMA_THINK = os.environ.get("OLLAMA_THINK", "false").lower() == "true"
+# Cap the context window. Models default to a huge context (e.g. qwen3 = 40k) whose
+# KV cache can push a model that would otherwise fit in VRAM onto the CPU. The prayer
+# task needs only a few thousand tokens, so a modest window keeps it fully on GPU.
+OLLAMA_NUM_CTX = int(os.environ.get("OLLAMA_NUM_CTX", "8192"))
 
 # --- Google sign-in / Drive backup (optional; features hidden when unset) ---
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")

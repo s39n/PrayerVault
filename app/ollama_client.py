@@ -1,10 +1,13 @@
 """Call the local Ollama model and shape its output for the vault note."""
 import json
+import logging
 import re
 
 import httpx
 
 from . import config, settings
+
+log = logging.getLogger("prayervault.ollama")
 
 
 class OllamaError(RuntimeError):
@@ -96,9 +99,13 @@ async def _chat(messages: list[dict]) -> str:
         "model": config.OLLAMA_MODEL,
         "stream": False,
         "format": "json",
-        "options": {"temperature": 0.6},
+        "options": {"temperature": 0.6, "num_ctx": config.OLLAMA_NUM_CTX},
         "messages": messages,
     }
+    if config.OLLAMA_THINK:
+        # Let a reasoning model (e.g. qwen3) think before it answers; Ollama returns
+        # the reasoning in a separate `thinking` field and keeps `content` as JSON.
+        payload["think"] = True
     async with httpx.AsyncClient(timeout=config.OLLAMA_TIMEOUT) as client:
         try:
             r = await client.post(f"{config.OLLAMA_URL}/api/chat", json=payload)
@@ -106,7 +113,7 @@ async def _chat(messages: list[dict]) -> str:
             raise OllamaError(
                 f"Ollama model '{config.OLLAMA_MODEL}' didn't respond within "
                 f"{config.OLLAMA_TIMEOUT}s. It may be too large/slow for the host — try a "
-                f"smaller, non-'thinking' model (e.g. qwen2.5:7b), or raise OLLAMA_TIMEOUT."
+                f"smaller model that fits your GPU, or raise OLLAMA_TIMEOUT."
             ) from e
         if r.status_code == 404:
             raise OllamaError(
@@ -115,7 +122,10 @@ async def _chat(messages: list[dict]) -> str:
                 f"or set OLLAMA_MODEL to a model that server already has."
             )
         r.raise_for_status()
-        return r.json()["message"]["content"]
+        msg = r.json().get("message", {})
+        if msg.get("thinking"):
+            log.debug("ollama reasoning (%s): %s", config.OLLAMA_MODEL, msg["thinking"][:400])
+        return msg.get("content", "")
 
 
 def _parse_json(content: str) -> dict:

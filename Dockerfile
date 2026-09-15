@@ -3,6 +3,8 @@ WORKDIR /srv
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
+COPY migrations ./migrations
+COPY alembic.ini ./
 RUN useradd -m appuser
 USER appuser
 EXPOSE 8000

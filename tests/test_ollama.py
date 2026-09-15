@@ -71,3 +71,37 @@ def test_slow_model_raises_clear_timeout_error(monkeypatch):
     with pytest.raises(OllamaError) as exc:
         asyncio.run(ollama_client._chat([{"role": "user", "content": "hi"}]))
     assert "didn't respond" in str(exc.value).lower()
+
+
+class _CaptureClient:
+    last_payload = None
+
+    def __init__(self, *a, **k):
+        pass
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *a):
+        return False
+
+    async def post(self, url, json=None):
+        _CaptureClient.last_payload = json
+        return httpx.Response(
+            200, request=httpx.Request("POST", url),
+            json={"message": {"content": '{"ok": true}', "thinking": "let me reason"}})
+
+
+def test_thinking_mode_sends_think_and_reads_content(monkeypatch):
+    monkeypatch.setattr(ollama_client.config, "OLLAMA_THINK", True)
+    monkeypatch.setattr(ollama_client.httpx, "AsyncClient", _CaptureClient)
+    content = asyncio.run(ollama_client._chat([{"role": "user", "content": "hi"}]))
+    assert content == '{"ok": true}'
+    assert _CaptureClient.last_payload.get("think") is True
+
+
+def test_think_omitted_when_disabled(monkeypatch):
+    monkeypatch.setattr(ollama_client.config, "OLLAMA_THINK", False)
+    monkeypatch.setattr(ollama_client.httpx, "AsyncClient", _CaptureClient)
+    asyncio.run(ollama_client._chat([{"role": "user", "content": "hi"}]))
+    assert "think" not in _CaptureClient.last_payload
