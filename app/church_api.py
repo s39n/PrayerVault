@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 
 from . import accounts, config, notifications, orgs, prayer_service as ps, webpush
 from .accounts import AccountError
+from .ollama_client import OllamaError
 from .orgs import OrgError
 from .prayer_service import PermissionDenied, PrayerError
 
@@ -114,6 +115,11 @@ class TextBody(BaseModel):
 class StatusBody(BaseModel):
     answered: bool
     text: str = Field(default="", max_length=20000)
+
+
+class OutreachBody(BaseModel):
+    channel: str = Field(default="call", max_length=20)
+    note: str = Field(default="", max_length=2000)
 
 
 class AssignBody(BaseModel):
@@ -275,6 +281,26 @@ async def add_update(pid: str, body: TextBody, bg: BackgroundTasks,
     _handle(lambda: ps.add_update(acct["org_id"], pid, acct["user_id"], body.text))
     bg.add_task(notifications.dispatch_pending)
     return {"ok": True}
+
+
+@router.post("/api/shared/{pid}/outreach")
+async def log_outreach(pid: str, body: OutreachBody,
+                       acct: dict = Depends(require_account)):
+    """Elder logs a call/visit/text. Resets the follow-up clock; member never sees it."""
+    _handle(lambda: ps.log_outreach(acct["org_id"], pid, acct["user_id"],
+                                    body.channel, body.note))
+    return {"ok": True}
+
+
+@router.post("/api/shared/{pid}/draft-checkin")
+async def draft_checkin(pid: str, acct: dict = Depends(require_account)):
+    """Elder asks the local AI to draft a check-in message. Nothing leaves the server."""
+    try:
+        return await ps.draft_checkin(acct["org_id"], pid, acct["user_id"])
+    except PermissionDenied as e:
+        raise HTTPException(403, str(e))
+    except (PrayerError, OllamaError) as e:
+        raise HTTPException(400, str(e))
 
 
 @router.post("/api/shared/{pid}/status")

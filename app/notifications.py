@@ -242,8 +242,10 @@ def build_weekly_digest(user_id: str, days: int = 7) -> tuple[str, str] | None:
         membership = s.exec(
             select(models.Membership).where(models.Membership.user_id == user_id)
         ).first()
+        is_elder = bool(membership and membership.role in ("elder", "admin"))
+        org_id = user.org_id
         unclaimed = 0
-        if membership and membership.role in ("elder", "admin"):
+        if is_elder:
             unclaimed = len(s.exec(
                 select(models.Prayer).where(
                     models.Prayer.org_id == user.org_id,
@@ -253,11 +255,25 @@ def build_weekly_digest(user_id: str, days: int = 7) -> tuple[str, str] | None:
                 )
             ).all())
 
-    if not (answered or active or unclaimed):
+    # Shepherding nudge: people this elder owns with no prayer or contact in
+    # `days`. Imported here because prayer_service imports this module up top.
+    followups: list[str] = []
+    if is_elder:
+        from . import prayer_service as ps
+        for f in ps.follow_up_list(org_id, user_id, days):
+            followups.append(f.get("subject_name") or f["title"])
+
+    if not (answered or active or unclaimed or followups):
         return None
     lines = ["Here's this week on your prayer list.\n"]
     if unclaimed:
         lines.append(f"• {unclaimed} request(s) are waiting for an elder to claim.")
+    if followups:
+        shown = ", ".join(followups[:5]) + ("…" if len(followups) > 5 else "")
+        lines.append(
+            f"• {len(followups)} need a check-in "
+            f"(no prayer or contact in {days}+ days): {shown}. "
+            f"Maybe this is a good time to reach out.")
     for title, n in active:
         lines.append(f"• “{title}” — {n} new update(s).")
     for title in answered:

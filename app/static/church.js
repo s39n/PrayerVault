@@ -224,8 +224,120 @@ function viewFollowUp(node) {
   const list = el("div", {});
   node.append(el("div", { class: "card" }, [
     el("h2", { text: "Needs follow-up" }),
-    el("p", { class: "muted", text: "Ongoing prayers you own with no recent update." }), list]));
-  listInto(list, "/api/elders/follow-up", "Nothing overdue. Everyone's been checked on.");
+    el("p", { class: "muted", text: "People you shepherd with no prayer or contact recently." }), list]));
+  renderFollowUp(list);
+}
+
+function daysSince(iso) {
+  const d = new Date(iso), now = new Date();
+  if (isNaN(d)) return null;
+  return Math.max(0, Math.floor((now - d) / 86400000));
+}
+
+async function renderFollowUp(list) {
+  clear(list);
+  list.append(el("p", { class: "muted", text: "Loading…" }));
+  let items;
+  try { items = await api("/api/elders/follow-up"); }
+  catch (e) { clear(list); list.append(el("p", { class: "err", text: e.detail || "Could not load" })); return; }
+  clear(list);
+  if (!items.length) { list.append(el("p", { class: "muted", text: "Nothing overdue. Everyone's been checked on." })); return; }
+  items.forEach(p => list.append(followUpCard(p, () => renderFollowUp(list))));
+}
+
+function followUpCard(p, refresh) {
+  const n = daysSince(p.last_activity);
+  const who = p.subject_name || p.title;
+  const badge = n === null ? "no recent contact"
+    : n + (n === 1 ? " day" : " days") + " since contact";
+  const card = el("div", { class: "prayer", style: "cursor:default" }, [
+    el("div", { class: "row" }, [
+      el("span", { class: "title", text: p.title }),
+      el("span", { class: "spacer" }),
+      el("span", { class: "badge unclaimed", text: badge }),
+    ]),
+    el("div", { class: "muted", text: "For " + who + (p.last_activity ? " · last activity " + fmtDate(p.last_activity) : "") }),
+    el("p", { text: "Maybe this is a good time to reach out." }),
+    el("div", { class: "row", style: "margin-top:6px" }, [
+      el("button", { class: "small", text: "Draft check-in", onclick: () => draftCheckInModal(p, refresh) }),
+      el("button", { class: "small ghost", text: "Log outreach", onclick: () => logOutreachModal(p, refresh) }),
+      el("button", { class: "small ghost", text: "Open", onclick: () => renderDetail(p.id) }),
+    ]),
+  ]);
+  return card;
+}
+
+// --- shepherding modals --------------------------------------------------
+
+function openModal(kids) {
+  const overlay = el("div", { class: "modal-overlay" });
+  const box = el("div", { class: "modal" }, kids);
+  overlay.addEventListener("click", e => { if (e.target === overlay) overlay.remove(); });
+  overlay.append(box);
+  document.body.append(overlay);
+  return { close: () => overlay.remove(), box };
+}
+
+async function draftCheckInModal(p, refresh) {
+  const m = openModal([el("h3", { text: "Draft check-in" }),
+    el("p", { class: "muted", text: "Asking your local AI…" })]);
+  const box = m.box, close = m.close;
+  let draftText;
+  try {
+    draftText = (await api("/api/shared/" + p.id + "/draft-checkin", "POST")).draft;
+  } catch (e) {
+    box.append(el("p", { class: "err", text: e.detail || "Could not draft a message" }));
+    return;
+  }
+  clear(box);
+  const ta = el("textarea", {});
+  ta.value = draftText;
+  const err = el("div", { class: "err" });
+  box.append(
+    el("h3", { text: "Draft check-in" }),
+    el("p", { class: "muted", text: "For " + (p.subject_name || p.title) + ". Edit as you like, then copy and send it yourself." }),
+    ta, err,
+    el("div", { class: "row", style: "margin-top:8px" }, [
+      el("button", { class: "small", text: "Copy", onclick: async () => {
+        try { await navigator.clipboard.writeText(ta.value); }
+        catch (e) { ta.select(); try { document.execCommand("copy"); } catch (e2) {} }
+      } }),
+      el("button", { class: "small ghost", text: "Log outreach", onclick: async () => {
+        err.textContent = "";
+        try {
+          await api("/api/shared/" + p.id + "/outreach", "POST", { channel: "text", note: "" });
+          close(); refresh();
+        } catch (e2) { err.textContent = e2.detail || "Could not log outreach"; }
+      } }),
+      el("button", { class: "small ghost", text: "Close", onclick: close }),
+    ]),
+  );
+}
+
+function logOutreachModal(p, refresh) {
+  const sel = el("select", {});
+  [["call", "Called"], ["visit", "Visited"], ["text", "Texted"], ["other", "Other"]]
+    .forEach(([v, l]) => sel.append(el("option", { value: v, text: l })));
+  const note = el("textarea", { placeholder: "Note (optional, elders only)…" });
+  const err = el("div", { class: "err" });
+  const m2 = openModal([
+    el("h3", { text: "Log outreach" }),
+    el("p", { class: "muted", text: "For " + (p.subject_name || p.title) + ". Only elders see this — it resets the follow-up clock." }),
+    el("label", { text: "How did you reach out?" }), sel,
+    el("label", { text: "Note" }), note,
+    err,
+    el("div", { class: "row", style: "margin-top:8px" }, [
+      el("button", { class: "small", text: "Save", onclick: async () => {
+        err.textContent = "";
+        try {
+          await api("/api/shared/" + p.id + "/outreach", "POST",
+            { channel: sel.value, note: note.value.trim() });
+          m2.close(); refresh();
+        } catch (e) { err.textContent = e.detail || "Could not save"; }
+      } }),
+      el("button", { class: "small ghost", text: "Cancel", onclick: m2.close }),
+    ]),
+  ]);
 }
 
 function viewInvite(node) {
@@ -282,6 +394,12 @@ async function renderDetail(pid) {
     actions.append(el("button", { class: "small", text: "I've got this", onclick: () => act(() => api("/api/shared/" + pid + "/claim", "POST")) }));
   }
   const canStatus = isElder() || p.owner_id === account.user_id;
+  if (isElder()) {
+    actions.append(el("button", { class: "small ghost", text: "Draft check-in",
+      onclick: () => draftCheckInModal(p, () => renderDetail(pid)) }));
+    actions.append(el("button", { class: "small ghost", text: "Log outreach",
+      onclick: () => logOutreachModal(p, () => renderDetail(pid)) }));
+  }
   if (canStatus && p.status !== "answered") {
     actions.append(el("button", { class: "small ghost", text: "Mark answered", onclick: () => {
       const t = prompt("A word of praise (optional):") || "";

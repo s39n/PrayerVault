@@ -16,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlmodel import select
 
-from . import db, models, notifications
+from . import db, models, notifications, ollama_client
 
 ELDER_ROLES = ("elder", "admin")
 
@@ -189,15 +189,25 @@ def set_status(org_id: str, prayer_id: str, actor_id: str, answered: bool,
 
 
 def timeline(org_id: str, prayer_id: str, viewer_id: str) -> list[dict]:
-    """Member-visible update timeline (never includes pastoral notes)."""
+    """Member-visible update timeline.
+
+    Never includes pastoral notes. Outreach entries (kind="outreach") are the
+    elder's private shepherding log and are visible to elders only.
+    """
     with db.tenant_scope(org_id) as t:
         p = t.get(models.Prayer, prayer_id)
         if p is None:
             raise PrayerError("Prayer not found")
+        is_elder = _role(t, viewer_id) in ELDER_ROLES
         rows = t.all(models.PrayerUpdate, models.PrayerUpdate.prayer_id == prayer_id)
         rows.sort(key=lambda u: u.created_at)
-        return [{"text": u.text, "kind": u.kind, "author_id": u.author_id,
-                 "created_at": u.created_at} for u in rows]
+        out = []
+        for u in rows:
+            if u.kind == "outreach" and not is_elder:
+                continue
+            out.append({"text": u.text, "kind": u.kind, "author_id": u.author_id,
+                        "created_at": u.created_at})
+        return out
 
 
 # --- subscriptions -------------------------------------------------------
@@ -257,6 +267,71 @@ def follow_up_list(org_id: str, elder_id: str, days: int | None = None) -> list[
 def _aware(dt: datetime) -> datetime:
     """SQLite may hand back naive datetimes; treat them as UTC for comparison."""
     return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+# --- shepherding: outreach log + check-in drafts -------------------------
+
+OUTREACH_CHANNELS = ("call", "visit", "text", "other")
+_OUTREACH_LABELS = {
+    "call": "Called", "visit": "Visited", "text": "Texted", "other": "Reached out to",
+}
+
+
+def log_outreach(org_id: str, prayer_id: str, elder_id: str,
+                 channel: str = "call", note: str = "") -> None:
+    """Record that an elder reached out (call/visit/text). Elders only.
+
+    Stored as a PrayerUpdate with kind="outreach", so it resets the follow-up
+    clock exactly like a prayer update does. It is the elder's private
+    shepherding log: timeline() hides it from the member. No notification is
+    sent — reaching out is the notification.
+    """
+    channel = (channel or "").strip().lower()
+    if channel not in OUTREACH_CHANNELS:
+        raise PrayerError(f"Channel must be one of: {', '.join(OUTREACH_CHANNELS)}")
+    with db.tenant_scope(org_id) as t:
+        if _role(t, elder_id) not in ELDER_ROLES:
+            raise PermissionDenied("Elders only")
+        p = t.get(models.Prayer, prayer_id)
+        if p is None:
+            raise PrayerError("Prayer not found")
+        who = p.subject_name or p.title
+        text = f"{_OUTREACH_LABELS[channel]} {who}"
+        note = (note or "").strip()
+        if note:
+            text += f" — {note[:500]}"
+        t.add(models.PrayerUpdate(prayer_id=prayer_id, author_id=elder_id,
+                                  text=text, kind="outreach"))
+        p.updated_at = _now()
+        t.add(p)
+
+
+async def draft_checkin(org_id: str, prayer_id: str, elder_id: str) -> dict:
+    """Draft a short check-in message for the elder to send. Elders only.
+
+    Uses the local Ollama model (nothing leaves the server). The prompt gets
+    member-visible context only — pastoral notes are elder-only and are NEVER
+    included, so the draft is always safe to send as-is.
+    """
+    with db.tenant_scope(org_id) as t:
+        if _role(t, elder_id) not in ELDER_ROLES:
+            raise PermissionDenied("Elders only")
+        p = t.get(models.Prayer, prayer_id)
+        if p is None:
+            raise PrayerError("Prayer not found")
+        ups = t.all(models.PrayerUpdate, models.PrayerUpdate.prayer_id == prayer_id)
+        ups.sort(key=lambda u: u.created_at, reverse=True)
+        visible = [u for u in ups
+                   if u.kind in ("created", "update", "answered", "reopened")][:5]
+        lines = []
+        if (p.body_md or "").strip():
+            lines.append(f"Details: {p.body_md.strip()[:2000]}")
+        lines.extend(f"- {u.created_at.date().isoformat()}: {u.text}" for u in visible)
+        context = "\n".join(lines)
+        subject = p.subject_name or p.title
+        title = p.title
+    draft = await ollama_client.draft_checkin(subject, title, context)
+    return {"draft": draft}
 
 
 # --- elder-only pastoral notes (never shown to the member) ---------------

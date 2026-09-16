@@ -167,6 +167,31 @@ async def ask(question: str) -> dict:
     return {"scripture_md": _shape(raw)["scripture_md"], "answer": str(raw.get("answer", "")).strip()}
 
 
+CHECKIN_PROMPT = """You are helping a Presbyterian church elder write a brief, warm check-in text message to someone in his congregation. You will be given the person's name (or the prayer title) and recent member-visible context about their prayer need.
+
+Respond ONLY with a JSON object with one key:
+
+"draft": the message text, 2-4 sentences, suitable for SMS. Warm and pastoral, grounded in Reformed faith, without church jargon or cliches. Address them by name. Reference their situation naturally from the context given. Offer prayer and an open door ("let me know if..."). Never invent specific facts that are not in the context. No greeting header like "Dear", no sign-off — just the message body."""
+
+
+async def draft_checkin(subject: str, title: str, context: str) -> str:
+    """Draft a short check-in message for an elder to send. Plain pastoral text."""
+    user_msg = (
+        f"Write a check-in message for {subject}.\n"
+        f"Prayer need: {title}\n"
+        f"Recent context:\n{context or '(no recent updates)'}"
+    )
+    content = await _chat([
+        {"role": "system", "content": _prompt("checkin", CHECKIN_PROMPT)},
+        {"role": "user", "content": user_msg},
+    ])
+    raw = _parse_json(content)
+    draft = str(raw.get("draft", "")).strip()
+    if not draft:
+        raise OllamaError("The model did not return a check-in draft.")
+    return draft
+
+
 async def health() -> dict:
     try:
         async with httpx.AsyncClient(timeout=5) as client:
