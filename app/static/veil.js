@@ -15,7 +15,7 @@
 
   var VERT = "attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}";
   var FRAG = `precision highp float;
-  uniform vec2 u_res; uniform float u_time; uniform float u_cw; uniform float u_wind;
+  uniform vec2 u_res; uniform float u_time; uniform float u_cw; uniform float u_wind; uniform float u_ribs;
   float hash(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}
   float noise(vec2 p){vec2 i=floor(p),f=fract(p);float a=hash(i),b=hash(i+vec2(1,0)),c=hash(i+vec2(0,1)),d=hash(i+vec2(1,1));vec2 u=f*f*(3.-2.*f);return mix(mix(a,b,u.x),mix(c,d,u.x),u.y);}
   float fbm(vec2 p){float s=0.,a=.5;for(int i=0;i<5;i++){s+=a*noise(p);p*=2.03;a*=.5;}return s;}
@@ -34,7 +34,7 @@
     float um=clamp(mx/base,0.0,1.0);
     float body=smoothstep(0.0,0.30,um)*smoothstep(1.0,0.72,um);
     float meander=(fbm(vec2(um*2.0,y*0.005))-0.5)*0.5*body;
-    float pcoord=pow(um,0.60)*8.5 + meander;
+    float pcoord=pow(um,0.60)*u_ribs + meander;
     float fold=cos(pcoord*6.2831853);
     float grain=(fbm(vec2(um*40.0,y*0.9))-0.5)*0.06;
     float shade=0.5+0.5*fold;
@@ -47,8 +47,8 @@
     col*=mix(1.06,.88,y/u_res.y);
     float rim=smoothstep(edge-14.,edge-2.,x); col+=vec3(.35,.24,.08)*rim*.5;
     float cov=1.0;
-    if(x>edge-8.0){ float th=noise(vec2(y*2.8+flow*4.0,u*20.0+t*0.08*w));
-      float k=(x-(edge-8.0))/8.0; cov=step(k,th*1.1); }
+    if(x>edge-6.4){ float th=noise(vec2(y*3.5+flow*4.0,u*25.0+t*0.08*w));
+      float k=(x-(edge-6.4))/6.4; cov=step(k,th*1.1); }
     return vec4(col,cov);
   }
   void main(){
@@ -78,7 +78,8 @@
   var l = gl.getAttribLocation(pr, "p");
   gl.enableVertexAttribArray(l); gl.vertexAttribPointer(l, 2, gl.FLOAT, false, 0, 0);
   var uR = gl.getUniformLocation(pr, "u_res"), uT = gl.getUniformLocation(pr, "u_time"),
-      uCw = gl.getUniformLocation(pr, "u_cw"), uW = gl.getUniformLocation(pr, "u_wind");
+      uCw = gl.getUniformLocation(pr, "u_cw"), uW = gl.getUniformLocation(pr, "u_wind"),
+      uRibs = gl.getUniformLocation(pr, "u_ribs");
 
   // WebGL is good: reveal the canvas and hide the static SVG veils.
   document.body.classList.add("veil-gl-on");
@@ -94,9 +95,11 @@
   var running = true, raf = 0;
   function frame(ms) {
     if (!running) return;
-    var cw = Math.min(Math.max(window.innerWidth * 0.18, 52), 250) / 0.8 * dpr; // in-between width
+    var avgW = Math.min(Math.max(window.innerWidth * 0.18, 52), 150); // narrower on desktop, phone unchanged
+    var cw = avgW / 0.8 * dpr;
+    var ribs = Math.min(Math.max(avgW * 0.121, 7.0), 40.0);           // keep rib thickness ~constant
     gl.uniform2f(uR, W, H); gl.uniform1f(uT, ms * 0.001);
-    gl.uniform1f(uCw, cw); gl.uniform1f(uW, 1.0); // medium wind at rest
+    gl.uniform1f(uCw, cw); gl.uniform1f(uRibs, ribs); gl.uniform1f(uW, 1.0); // medium wind at rest
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     raf = window.requestAnimationFrame(frame);
   }
