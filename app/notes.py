@@ -205,6 +205,81 @@ def add_update(note_id: str, text: str, root: Path | str | None = None) -> None:
     write_note(note_id, note["frontmatter"], note["sections"], root)
 
 
+# --- shepherding: outreach log + gone-quiet follow-up ---------------------
+
+OUTREACH_CHANNELS = ("call", "visit", "text", "other")
+_OUTREACH_LABELS = {
+    "call": "Called", "visit": "Visited", "text": "Texted", "other": "Reached out to",
+}
+FOLLOWUP_DAYS = 14
+_UPDATE_DATE_RE = re.compile(r"^- (\d{4}-\d{2}-\d{2}) — ", re.MULTILINE)
+
+
+def _who(fm: dict, note_id: str) -> str:
+    """The person a prayer is for — used when logging or drafting a check-in."""
+    return str(fm.get("requested-by") or fm.get("title") or note_id)
+
+
+def log_outreach(note_id: str, channel: str = "call", note: str = "",
+                 root: Path | str | None = None) -> None:
+    """Record that you reached out (call/visit/text) about a prayer.
+
+    Stored as a dated line in the Updates section, so it resets the gone-quiet
+    follow-up clock exactly like any other update does.
+    """
+    channel = (channel or "").strip().lower()
+    if channel not in OUTREACH_CHANNELS:
+        raise ValueError(f"Channel must be one of: {', '.join(OUTREACH_CHANNELS)}")
+    n = read_note(note_id, root)
+    fm, sections = n["frontmatter"], n["sections"]
+    today = datetime.date.today().isoformat()
+    text = f"{_OUTREACH_LABELS[channel]} {_who(fm, note_id)}"
+    note = (note or "").strip()
+    if note:
+        text += f" — {note[:500]}"
+    updates = sections.get("Updates", "")
+    sections["Updates"] = (updates + f"\n- {today} — {text}").strip()
+    write_note(note_id, fm, sections, root)
+
+
+def last_activity(fm: dict, sections: dict[str, str]) -> str:
+    """ISO date of the most recent Updates entry; falls back to the note's date."""
+    dates = _UPDATE_DATE_RE.findall(sections.get("Updates", "") or "")
+    return max(dates) if dates else str(fm.get("date", ""))
+
+
+def follow_up_list(root: Path | str | None = None,
+                   days: int = FOLLOWUP_DAYS) -> list[dict]:
+    """Ongoing prayers with no update or contact in ``days`` days, quietest first."""
+    today = datetime.date.today()
+    cutoff = today - datetime.timedelta(days=days)
+    out = []
+    for p in vault_dir(root).glob("*.md"):
+        try:
+            fm, sections = parse_note(p.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if "prayer" not in (fm.get("tags") or []):
+            continue
+        if fm.get("status", "ongoing") == "answered":
+            continue
+        try:
+            la_date = datetime.date.fromisoformat(last_activity(fm, sections))
+        except ValueError:
+            continue
+        if la_date <= cutoff:
+            out.append({
+                "id": p.stem,
+                "title": fm.get("title", p.stem),
+                "for": fm.get("requested-by", ""),
+                "family": fm.get("family", ""),
+                "last_activity": la_date.isoformat(),
+                "days_since": (today - la_date).days,
+            })
+    out.sort(key=lambda x: x["last_activity"])
+    return out
+
+
 def set_status(note_id: str, status: str, note_text: str = "",
                root: Path | str | None = None) -> None:
     note = read_note(note_id, root)

@@ -3,7 +3,7 @@
 // immediately, cache fallback so the shell still opens offline. API calls are
 // never intercepted — prayer data always comes from the server.
 
-const CACHE = "prayervault-v3";
+const CACHE = "prayervault-v4";
 const SHELL = [
   "/",
   "/app.js",

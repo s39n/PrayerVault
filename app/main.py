@@ -203,6 +203,11 @@ class TextBody(BaseModel):
     text: str = Field(default="", max_length=5000)
 
 
+class OutreachBody(BaseModel):
+    channel: str = Field(default="call", max_length=20)
+    note: str = Field(default="", max_length=2000)
+
+
 async def _run_ai(note_id: str, kind: str, title: str, text: str, requested_by: str,
                   root=None):
     try:
@@ -276,6 +281,46 @@ async def add_update(note_id: str, body: TextBody,
     _get_or_404(note_id, root)
     notes.add_update(note_id, body.text, root=root)
     return {"ok": True}
+
+
+@app.get("/api/follow-up")
+async def follow_up(user: str = Depends(auth.require_auth)):
+    """Ongoing prayers gone quiet — no update or contact in a while."""
+    return notes.follow_up_list(users.vault_for(user))
+
+
+@app.post("/api/prayers/{note_id}/outreach")
+async def log_outreach(note_id: str, body: OutreachBody,
+                       user: str = Depends(auth.require_auth)):
+    """Log that you reached out (call/visit/text). Resets the gone-quiet clock."""
+    root = users.vault_for(user)
+    _get_or_404(note_id, root)
+    try:
+        notes.log_outreach(note_id, body.channel, body.note, root=root)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    return {"ok": True}
+
+
+@app.post("/api/prayers/{note_id}/draft-checkin")
+async def draft_checkin(note_id: str, user: str = Depends(auth.require_auth)):
+    """Ask the local model to draft a warm check-in message you can send."""
+    auth.check_ai_limit(user)
+    root = users.vault_for(user)
+    note = _get_or_404(note_id, root)
+    fm, sections = note["frontmatter"], note["sections"]
+    subject = fm.get("requested-by") or fm.get("title") or note_id
+    parts = []
+    if (sections.get("Prayer") or "").strip():
+        parts.append(f"Details: {sections['Prayer'].strip()[:2000]}")
+    if (sections.get("Updates") or "").strip():
+        parts.append("Recent updates:\n" + sections["Updates"].strip()[:1500])
+    try:
+        draft = await ollama_client.draft_checkin(
+            subject, fm.get("title", note_id), "\n".join(parts))
+    except Exception as e:
+        raise HTTPException(503, f"Model unavailable: {e}")
+    return {"draft": draft}
 
 
 @app.post("/api/prayers/{note_id}/regenerate")

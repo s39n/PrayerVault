@@ -216,6 +216,8 @@ async function renderToday() {
   show("today-view");
   setNav("today");
   const items = await api("/api/prayers");
+  let followups = [];
+  try { followups = await api("/api/follow-up"); } catch (e) { /* nudge is best-effort */ }
   let first = "friend";
   try {
     const me = await api("/api/me");
@@ -238,6 +240,17 @@ async function renderToday() {
       ? `<div class="next-step">No prayers are waiting on you today. Visit <strong>Fruit</strong> to remember how God has answered.</div>`
       : `<div class="next-step">Nothing is on your heart here yet. When you're ready, bring a matter into the light.</div>
          <div class="row" style="justify-content:center"><button class="primary" id="today-new">+ Bring a matter</button></div>`);
+  const nudgeHtml = followups.length ? `
+    <div class="card" style="border-left:3px solid var(--gold)">
+      <div class="eyebrow" style="color:var(--gold)">Quiet a while</div>
+      <p class="meta" style="margin:6px 0 10px">These have gone quiet — maybe a good time to reach out.</p>
+      ${followups.slice(0, 5).map((f) => `
+        <div class="row nudge-row" data-id="${esc(f.id)}" style="justify-content:space-between;cursor:pointer;padding:8px 0;border-top:1px solid var(--line)">
+          <span>${esc(f.title)}${f.for ? ' <span class="meta">· for ' + esc(f.for) + '</span>' : ''}</span>
+          <span class="meta">${f.days_since}d quiet</span>
+        </div>`).join("")}
+      ${followups.length > 5 ? `<p class="meta" style="margin-top:8px">+ ${followups.length - 5} more waiting</p>` : ""}
+    </div>` : "";
   $("today-view").innerHTML = `
     <div class="greeting">
       <span class="eyebrow">${esc(today)}</span>
@@ -248,11 +261,14 @@ async function renderToday() {
       <div class="verse-text">“${esc(text)}”</div>
       <div class="verse-ref">${esc(ref)}</div>
     </div>
+    ${nudgeHtml}
     ${heroHtml}`;
   const hero = $("today-view").querySelector(".hero");
   if (hero) hero.addEventListener("click", () => renderDetail(hero.dataset.id));
   const tn = $("today-new");
   if (tn) tn.addEventListener("click", renderNew);
+  $("today-view").querySelectorAll(".nudge-row").forEach((r) =>
+    r.addEventListener("click", () => renderDetail(r.dataset.id)));
 }
 
 // ---------- Fruit (answered prayers) ----------
@@ -826,6 +842,88 @@ async function renderYou() {
   });
 }
 
+// ---------- Shepherding (check-in draft + outreach log) ----------
+function openModal() {
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  const box = document.createElement("div");
+  box.className = "modal";
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+  overlay.append(box);
+  document.body.append(overlay);
+  return { close: () => overlay.remove(), box };
+}
+
+async function draftCheckInModal(pid, who, refresh) {
+  const m = openModal();
+  m.box.innerHTML = `<h3>Draft check-in</h3><p class="meta"><span class="spinner"></span> Asking your local AI…</p>`;
+  let draft;
+  try {
+    draft = (await api(`/api/prayers/${encodeURIComponent(pid)}/draft-checkin`, { method: "POST" })).draft;
+  } catch (e) {
+    m.box.innerHTML = `<h3>Draft check-in</h3><div class="error-msg">${esc(e.message)}</div>
+      <div class="row" style="margin-top:12px"><button class="link" id="ci-x">Close</button></div>`;
+    m.box.querySelector("#ci-x").addEventListener("click", m.close);
+    return;
+  }
+  m.box.innerHTML = `
+    <h3>Draft check-in</h3>
+    <p class="meta">${who ? "For " + esc(who) + ". " : ""}Edit it as you like, then copy and send it yourself.</p>
+    <textarea id="ci-text"></textarea>
+    <div class="error-msg" id="ci-err"></div>
+    <div class="row" style="margin-top:12px">
+      <button class="primary" id="ci-copy">Copy</button>
+      <button id="ci-log">Copied — log as sent</button>
+      <button class="link" id="ci-x">Close</button>
+    </div>`;
+  m.box.querySelector("#ci-text").value = draft;
+  m.box.querySelector("#ci-x").addEventListener("click", m.close);
+  m.box.querySelector("#ci-copy").addEventListener("click", async () => {
+    const val = m.box.querySelector("#ci-text").value;
+    try { await navigator.clipboard.writeText(val); toast("Copied to clipboard."); }
+    catch (e) { const t = m.box.querySelector("#ci-text"); t.select(); try { document.execCommand("copy"); toast("Copied."); } catch (e2) { toast("Select the text and copy it manually."); } }
+  });
+  m.box.querySelector("#ci-log").addEventListener("click", async () => {
+    m.box.querySelector("#ci-err").textContent = "";
+    try {
+      await api(`/api/prayers/${encodeURIComponent(pid)}/outreach`, { method: "POST", body: JSON.stringify({ channel: "text", note: "" }) });
+      m.close(); toast("Logged as sent."); if (refresh) refresh();
+    } catch (e) { m.box.querySelector("#ci-err").textContent = e.message; }
+  });
+}
+
+function logOutreachModal(pid, who, refresh) {
+  const m = openModal();
+  m.box.innerHTML = `
+    <h3>Log outreach</h3>
+    <p class="meta">${who ? "For " + esc(who) + ". " : ""}Records a note and resets the follow-up clock.</p>
+    <label>How did you reach out?</label>
+    <select id="lo-channel">
+      <option value="call">Called</option>
+      <option value="visit">Visited</option>
+      <option value="text">Texted</option>
+      <option value="other">Other</option>
+    </select>
+    <label>Note (optional)</label>
+    <textarea id="lo-note" placeholder="e.g. Left a voicemail; will follow up next week"></textarea>
+    <div class="error-msg" id="lo-err"></div>
+    <div class="row" style="margin-top:12px">
+      <button class="primary" id="lo-save">Save</button>
+      <button class="link" id="lo-cancel">Cancel</button>
+    </div>`;
+  m.box.querySelector("#lo-cancel").addEventListener("click", m.close);
+  m.box.querySelector("#lo-save").addEventListener("click", async () => {
+    m.box.querySelector("#lo-err").textContent = "";
+    try {
+      await api(`/api/prayers/${encodeURIComponent(pid)}/outreach`, { method: "POST", body: JSON.stringify({
+        channel: m.box.querySelector("#lo-channel").value,
+        note: m.box.querySelector("#lo-note").value.trim(),
+      }) });
+      m.close(); toast("Outreach logged."); if (refresh) refresh();
+    } catch (e) { m.box.querySelector("#lo-err").textContent = e.message; }
+  });
+}
+
 // ---------- Detail ----------
 function relatedHtml(s) {
   if (!s["Related"]) return "";
@@ -863,6 +961,11 @@ async function renderDetail(id) {
         <button id="btn-update">Add update</button>
         ${fm.ai !== "pending" ? '<button id="btn-regen">Regenerate response</button>' : ""}
       </div>
+      ${(fm.type === "request" || fm["requested-by"] || fm.family) ? `
+      <div class="row" style="margin-top:10px">
+        <button id="btn-checkin">Draft check-in</button>
+        <button id="btn-outreach">Log outreach</button>
+      </div>` : ""}
       <div class="row" style="margin-top:12px;align-items:center;gap:8px">
         <span class="eyebrow">File under</span>
         <select id="detail-family" style="flex:1;max-width:280px"><option value="">— none —</option></select>
@@ -898,6 +1001,10 @@ async function renderDetail(id) {
     await api(`/api/prayers/${encodeURIComponent(id)}/regenerate`, { method: "POST", body: JSON.stringify({}) });
     renderDetail(id);
   });
+  const btnC = $("btn-checkin"), btnO = $("btn-outreach");
+  const who = fm["requested-by"] || fm.title;
+  if (btnC) btnC.addEventListener("click", () => draftCheckInModal(id, who, () => renderDetail(id)));
+  if (btnO) btnO.addEventListener("click", () => logOutreachModal(id, who, () => renderDetail(id)));
   if (pending && !pollTimer) {
     pollTimer = setInterval(async () => {
       const fresh = await api("/api/prayers/" + encodeURIComponent(id));

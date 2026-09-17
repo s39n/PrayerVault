@@ -75,6 +75,10 @@ a.drive-btn:hover{border-color:var(--gold)}
 .error-msg{color:var(--danger);font-size:.9rem;min-height:1.2em;margin-top:8px}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--accent-dark);color:#fff;padding:10px 22px;border-radius:24px;z-index:10;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:.9rem}
 .hidden{display:none}
+.modal-overlay{position:fixed;inset:0;background:rgba(47,42,34,.45);display:flex;align-items:center;justify-content:center;padding:18px;z-index:20}
+.modal{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px;max-width:520px;width:100%;max-height:85vh;overflow:auto;box-shadow:0 18px 50px rgba(80,60,30,.28)}
+.modal h3{font-weight:normal;margin:0 0 6px;font-size:1.3rem}
+.modal textarea{min-height:120px}
 .spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;vertical-align:middle}
 @keyframes spin{to{transform:rotate(360deg)}}
 blockquote{border-left:3px solid var(--gold);margin:8px 0;padding:2px 14px;color:var(--muted);font-style:italic}
@@ -312,6 +316,6 @@ nav#nav,main{position:relative;z-index:1}
   <div id="detail-view" class="hidden"></div>
   <div id="new-view" class="hidden"></div>
 </main>
-<script src="/app.js?v=3"></script>
+<script src="/app.js?v=4"></script>
 </body>
 </html>
