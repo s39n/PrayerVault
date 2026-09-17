@@ -105,6 +105,9 @@ nav#nav.hidden{display:none}
 .veil{position:fixed;top:0;height:100vh;width:clamp(28px,calc(50vw - 360px - 8px),420px);transition:width .4s ease;z-index:0;pointer-events:none;overflow:hidden}
 .veil-left{left:0}
 .veil-right{right:0}
+#veil-gl{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;display:none}
+body.veil-gl-on #veil-gl{display:block}
+body.veil-gl-on .veil{display:none}
 .veil-fabric{position:absolute;top:-4%;height:112%;width:calc(100% + 18px);background-size:100% 100%;background-repeat:no-repeat;will-change:transform,filter;backface-visibility:hidden;filter:url(#veilflow)}
 .veil-left .veil-fabric{left:-18px;background-image:url('/veil-left.svg?v=4');transform-origin:left center;animation:swayL 17s ease-in-out infinite}
 .veil-right .veil-fabric{right:-18px;background-image:url('/veil-right.svg?v=4');transform-origin:right center;animation:swayR 21s ease-in-out infinite;animation-delay:-6s;filter:url(#veilflow2)}
@@ -261,6 +264,7 @@ nav#nav,main{position:relative;z-index:1}
 </style>
 </head>
 <body>
+<canvas id="veil-gl" aria-hidden="true"></canvas>
 <svg class="veil-fx" width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
   <defs>
     <filter id="veilflow" x="-25%" y="-25%" width="150%" height="150%" color-interpolation-filters="sRGB">
@@ -339,5 +343,6 @@ nav#nav,main{position:relative;z-index:1}
   <div id="new-view" class="hidden"></div>
 </main>
 <script src="/app.js?v=4"></script>
+<script src="/veil.js?v=1"></script>
 </body>
 </html>

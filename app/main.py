@@ -559,6 +559,7 @@ ASSETS = {
     "privacy.html": ("text/html", NO_CACHE),
     "terms.html": ("text/html", NO_CACHE),
     "sw.js": ("application/javascript", NO_CACHE),
+    "veil.js": ("application/javascript", NO_CACHE),
     "favicon.ico": ("image/x-icon", DAY_CACHE),
     "icon.svg": ("image/svg+xml", DAY_CACHE),
     "veil-left.svg": ("image/svg+xml", DAY_CACHE),

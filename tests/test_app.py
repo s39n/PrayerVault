@@ -209,6 +209,7 @@ def test_pwa_assets_public():
     for path, ctype in [
         ("/manifest.webmanifest", "application/manifest+json"),
         ("/sw.js", "application/javascript"),
+        ("/veil.js", "application/javascript"),
         ("/favicon.ico", "image/x-icon"),
         ("/icon-192.png", "image/png"),
         ("/veil-left.svg", "image/svg+xml"),
