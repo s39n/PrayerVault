@@ -213,6 +213,8 @@ def test_pwa_assets_public():
         ("/favicon.ico", "image/x-icon"),
         ("/icon-192.png", "image/png"),
         ("/veil-left.svg", "image/svg+xml"),
+        ("/veil-velvet-diff.jpg", "image/jpeg"),
+        ("/veil-velvet-nor.jpg", "image/jpeg"),
     ]:
         r = client.get(path)
         assert r.status_code == 200, path

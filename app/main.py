@@ -564,6 +564,8 @@ ASSETS = {
     "icon.svg": ("image/svg+xml", DAY_CACHE),
     "veil-left.svg": ("image/svg+xml", DAY_CACHE),
     "veil-right.svg": ("image/svg+xml", DAY_CACHE),
+    "veil-velvet-diff.jpg": ("image/jpeg", DAY_CACHE),
+    "veil-velvet-nor.jpg": ("image/jpeg", DAY_CACHE),
     "icon-192.png": ("image/png", DAY_CACHE),
     "icon-512.png": ("image/png", DAY_CACHE),
     "icon-maskable-512.png": ("image/png", DAY_CACHE),
