@@ -26,10 +26,11 @@ body{
     linear-gradient(180deg, var(--bg2) 0%, var(--bg) 100%);
   background-attachment:fixed;min-height:100vh;
 }
-header{display:flex;align-items:center;justify-content:space-between;padding:14px 22px;position:sticky;top:0;z-index:5;
-  background:linear-gradient(180deg,rgba(250,245,232,.72),rgba(245,239,225,.5));
+.topbar{position:sticky;top:0;z-index:5;
+  background:linear-gradient(180deg,rgba(250,245,232,.78),rgba(245,239,225,.64));
   backdrop-filter:blur(14px) saturate(1.15);-webkit-backdrop-filter:blur(14px) saturate(1.15);
   border-bottom:1px solid rgba(214,201,173,.45)}
+header{display:flex;align-items:center;justify-content:space-between;padding:14px 22px}
 header h1{font-size:1.15rem;margin:0;font-weight:normal;letter-spacing:2px;text-transform:uppercase;color:var(--accent-dark);white-space:nowrap;
   text-shadow:0 0 10px rgba(255,252,240,.95),0 0 22px rgba(255,252,240,.8),0 0 38px rgba(255,250,235,.6)}
 #header-actions{display:flex;gap:10px;align-items:center;flex-shrink:0}
@@ -84,10 +85,10 @@ a.drive-btn:hover{border-color:var(--gold)}
 blockquote{border-left:3px solid var(--gold);margin:8px 0;padding:2px 14px;color:var(--muted);font-style:italic}
 ul{padding-left:22px}
 .verse-quote{white-space:pre-wrap}
-nav#nav{display:flex;gap:8px;justify-content:center;padding:4px 20px 2px;flex-wrap:wrap}
+nav#nav{display:flex;gap:8px;justify-content:center;padding:0 20px 2px;flex-wrap:wrap}
 nav#nav.hidden{display:none}
 #login-verse,.verse-text,.verse-ref{transition:opacity .6s ease}
-.nav-item{border:none;background:none;color:var(--muted);border-radius:0;padding:6px 14px 10px;font-size:.95rem;letter-spacing:.5px;border-bottom:2px solid transparent}
+.nav-item{border:none;background:none;color:#6e6557;border-radius:0;padding:6px 14px 10px;font-size:.95rem;letter-spacing:.5px;border-bottom:2px solid transparent}
 .nav-item:hover{color:var(--accent-dark);border-color:var(--line)}
 .nav-item.active{color:var(--accent-dark);border-color:var(--gold)}
 .greeting{text-align:center;margin:18px 0 24px}
@@ -289,6 +290,7 @@ nav#nav,main{position:relative;z-index:1}
 </svg>
 <div class="veil veil-left" aria-hidden="true"><div class="veil-fabric"></div></div>
 <div class="veil veil-right" aria-hidden="true"><div class="veil-fabric"></div></div>
+<div class="topbar">
 <header>
   <h1>Prayer<em>Vault</em></h1>
   <div id="header-actions" class="hidden">
@@ -305,6 +307,7 @@ nav#nav,main{position:relative;z-index:1}
   <button class="nav-item" data-nav="dictate">Dictate</button>
   <button class="nav-item" data-nav="you">You</button>
 </nav>
+</div>
 <main>
   <div id="login-view" class="card hidden">
     <h2 style="margin-top:0;font-weight:normal">Sign in</h2>
