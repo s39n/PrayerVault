@@ -241,7 +241,7 @@ async function renderToday() {
       : `<div class="next-step">Nothing is on your heart here yet. When you're ready, bring a matter into the light.</div>
          <div class="row" style="justify-content:center"><button class="primary" id="today-new">+ Bring a matter</button></div>`);
   const nudgeHtml = followups.length ? `
-    <div class="card" style="border-left:3px solid var(--gold)">
+    <div class="card" style="border-color:rgba(169,132,60,.5)">
       <div class="eyebrow" style="color:var(--gold)">Quiet a while</div>
       <p class="meta" style="margin:6px 0 10px">These have gone quiet — maybe a good time to reach out.</p>
       ${followups.slice(0, 5).map((f) => `
