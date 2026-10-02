@@ -14,7 +14,7 @@
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <style>
-:root{--bg:#efe7d6;--bg2:#f5efe1;--card:#fffdf7;--ink:#2f2a22;--muted:#675f52;--accent:#5b6e58;--accent-dark:#46543f;--gold:#a9843c;--line:#e6ddca;--danger:#9c4a3c}
+:root{--bg:#efe7d6;--bg2:#f5efe1;--card:#fffdf7;--ink:#2f2a22;--muted:#675f52;--accent:#5b6e58;--accent-dark:#46543f;--gold:#a9843c;--gold-ink:#7d5f22;--line:#e6ddca;--danger:#9c4a3c}
 *{box-sizing:border-box}
 body{
   margin:0;color:var(--ink);line-height:1.6;
@@ -36,14 +36,14 @@ header h1{font-size:1.15rem;margin:0;font-weight:normal;letter-spacing:2px;text-
 #header-actions{display:flex;gap:10px;align-items:center;flex-shrink:0}
 #header-actions.hidden{display:none}
 #header-actions button{white-space:nowrap}
-header h1 em{color:var(--gold);font-style:italic;letter-spacing:1px;text-transform:none}
+header h1 em{color:var(--gold-ink);font-style:italic;letter-spacing:1px;text-transform:none}
 main{max-width:760px;margin:0 auto;padding:12px 20px 60px}
 button{font-family:inherit;font-size:.95rem;border:1px solid var(--line);background:rgba(255,255,255,.55);color:var(--ink);padding:9px 16px;border-radius:24px;cursor:pointer;transition:background .2s,border-color .2s}
 button:hover{border-color:var(--gold)}
 button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 button.primary:hover{background:var(--accent-dark);border-color:var(--accent-dark)}
 button.link{border:none;background:none;color:var(--accent);padding:4px;border-radius:0}
-button.link:hover{color:var(--gold)}
+button.link:hover{color:var(--gold-ink)}
 input,textarea,select{font-family:inherit;font-size:1rem;width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.75);color:var(--ink)}
 input:focus,textarea:focus,select:focus{outline:none;border-color:var(--gold)}
 textarea{min-height:140px;resize:vertical}
@@ -52,7 +52,7 @@ label{display:block;margin:12px 0 4px;color:var(--muted);font-size:.8rem;text-tr
 .card.clickable{transition:box-shadow .2s,transform .15s}
 .card.clickable:hover{box-shadow:0 10px 30px rgba(120,100,60,.13);transform:translateY(-1px);cursor:pointer}
 .hero{background:linear-gradient(180deg,rgba(255,253,247,.9),rgba(250,244,231,.9));border:1px solid var(--line);border-radius:20px;padding:30px 26px;margin-bottom:22px;box-shadow:0 10px 34px rgba(120,100,60,.1)}
-.hero .eyebrow{color:var(--gold)}
+.hero .eyebrow{color:var(--gold-ink)}
 .hero h2{font-size:1.9rem;line-height:1.25;margin:8px 0 10px;font-weight:normal;letter-spacing:.2px}
 .hero p{color:var(--muted);margin:0 0 18px;font-style:italic}
 .eyebrow{font-size:.72rem;text-transform:uppercase;letter-spacing:2.5px;color:var(--muted)}
@@ -61,11 +61,11 @@ label{display:block;margin:12px 0 4px;color:var(--muted);font-size:.8rem;text-tr
 .chip.active{background:var(--accent);border-color:var(--accent);color:#fff}
 .badge{font-size:.72rem;padding:3px 11px;border-radius:12px;background:var(--line);color:var(--muted);letter-spacing:.5px}
 .badge.answered{background:#dfe8d9;color:var(--accent-dark)}
-.badge.pending{background:#f3e8cf;color:var(--gold)}
+.badge.pending{background:#f3e8cf;color:var(--gold-ink)}
 .badge.error{background:#f0d9d3;color:var(--danger)}
 .meta{color:var(--muted);font-size:.85rem}
-.section-title{color:var(--gold);font-size:.72rem;text-transform:uppercase;letter-spacing:2.5px;margin:22px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--line)}
-.scripture-ref{color:var(--gold);font-weight:bold}
+.section-title{color:var(--gold-ink);font-size:.72rem;text-transform:uppercase;letter-spacing:2.5px;margin:22px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.scripture-ref{color:var(--gold-ink);font-weight:bold}
 #login-view{max-width:380px;margin:12vh auto}
 .or-divider{display:flex;align-items:center;gap:10px;margin:16px 0 12px;color:var(--muted);font-size:.8rem}
 .or-divider::before,.or-divider::after{content:"";flex:1;border-top:1px solid var(--line)}
@@ -96,13 +96,13 @@ nav#nav.hidden{display:none}
 .greeting h2{font-size:1.7rem;font-weight:normal;margin:0}
 .verse-card{background:linear-gradient(180deg,rgba(255,253,247,.95),rgba(249,242,228,.95));border:1px solid var(--line);border-radius:20px;padding:26px;margin-bottom:22px;text-align:center;box-shadow:0 8px 28px rgba(120,100,60,.08)}
 .verse-card .verse-text{font-size:1.25rem;line-height:1.5;font-style:italic;color:var(--ink);margin:6px 0 12px}
-.verse-card .verse-ref{color:var(--gold);letter-spacing:1px;font-size:.9rem}
+.verse-card .verse-ref{color:var(--gold-ink);letter-spacing:1px;font-size:.9rem}
 .next-step{text-align:center;color:var(--muted);font-style:italic;margin:18px 0}
 .fruit-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}
 .fruit-card{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:14px;padding:18px;box-shadow:0 6px 24px rgba(120,100,60,.06);transition:box-shadow .2s,transform .15s;cursor:pointer}
 .fruit-card:hover{box-shadow:0 10px 30px rgba(120,100,60,.13);transform:translateY(-1px)}
 .fruit-card h3{font-size:1.1rem;font-weight:normal;margin:0 0 4px}
-.fruit-card .answered-on{color:var(--gold);font-size:.78rem;text-transform:uppercase;letter-spacing:1.5px}
+.fruit-card .answered-on{color:var(--gold-ink);font-size:.78rem;text-transform:uppercase;letter-spacing:1.5px}
 .veil{position:fixed;top:0;height:100vh;width:clamp(28px,calc(50vw - 360px - 8px),420px);transition:width .4s ease;z-index:0;pointer-events:none;overflow:hidden}
 .veil-left{left:0}
 .veil-right{right:0}
@@ -332,7 +332,7 @@ nav#nav,main{position:relative;z-index:1}
         <a href="/privacy.html" style="color:var(--accent)">Privacy Policy</a> &nbsp;·&nbsp;
         <a href="/terms.html" style="color:var(--accent)">Terms of Service</a> &nbsp;·&nbsp;
         <a href="https://github.com/s39n/PrayerVault" rel="noopener" style="color:var(--accent)">Source on GitHub</a> &nbsp;·&nbsp;
-        <a href="https://buymeacoffee.com/seanseanric" rel="noopener" style="color:var(--gold)">Buy me a coffee ☕</a></p>
+        <a href="https://buymeacoffee.com/seanseanric" rel="noopener" style="color:var(--gold-ink)">Buy me a coffee ☕</a></p>
     </div>
   </div>
   <div id="today-view" class="hidden"></div>
@@ -345,7 +345,7 @@ nav#nav,main{position:relative;z-index:1}
   <div id="detail-view" class="hidden"></div>
   <div id="new-view" class="hidden"></div>
 </main>
-<script src="/app.js?v=5"></script>
+<script src="/app.js?v=6"></script>
 <script src="/veil.js?v=3"></script>
 </body>
 </html>

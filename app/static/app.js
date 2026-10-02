@@ -242,7 +242,7 @@ async function renderToday() {
          <div class="row" style="justify-content:center"><button class="primary" id="today-new">+ Bring a matter</button></div>`);
   const nudgeHtml = followups.length ? `
     <div class="card" style="border-color:rgba(169,132,60,.5)">
-      <div class="eyebrow" style="color:var(--gold)">Quiet a while</div>
+      <div class="eyebrow" style="color:var(--gold-ink)">Quiet a while</div>
       <p class="meta" style="margin:6px 0 10px">These have gone quiet — maybe a good time to reach out.</p>
       ${followups.slice(0, 5).map((f) => `
         <div class="row nudge-row" data-id="${esc(f.id)}" style="justify-content:space-between;cursor:pointer;padding:8px 0;border-top:1px solid var(--line)">
@@ -374,7 +374,7 @@ async function renderDictate() {
           <button id="dictate-btn-clear" class="btn-dictate-action" title="Clear text">🗑️ Clear</button>
           <button id="dictate-btn-download" class="btn-dictate-action" title="Download as .txt file">💾 Download</button>
         </div>
-        <button id="dictate-btn-new-prayer" class="btn-dictate-action" style="border-color:var(--gold); color:var(--gold)" title="Create a new prayer note with this text">✨ Create Prayer</button>
+        <button id="dictate-btn-new-prayer" class="btn-dictate-action" style="border-color:var(--gold); color:var(--gold-ink)" title="Create a new prayer note with this text">✨ Create Prayer</button>
       </div>
       <div class="error-msg" id="dictate-error"></div>
     </div>
