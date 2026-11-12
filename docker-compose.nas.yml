@@ -43,7 +43,7 @@ services:
       # 9router (OpenAI-compatible). Leave LLM_BASE_URL empty to use OLLAMA_URL.
       - LLM_BASE_URL=${LLM_BASE_URL-http://10.0.0.210:20128/v1}
       - LLM_API_KEY=${LLM_API_KEY:-}
-      - LLM_MODEL=${LLM_MODEL:-gc/gemini-2.5-flash}
+      - LLM_MODEL=${LLM_MODEL:-gh/gpt-4.1}
       - OLLAMA_URL=${OLLAMA_URL:-http://ollama:11434}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma3:12b}
       # Reasoning model support: OLLAMA_THINK=true for qwen3 etc.; cap context so a

@@ -189,3 +189,18 @@ def test_embedding_model_change_triggers_reindex(monkeypatch, tmp_path):
     monkeypatch.setattr(embeddings, "_embed", fake)
     idx = asyncio.run(embeddings.ensure_index())
     assert idx["n1"]["vec"] == [9.0, 9.0] and idx["n1"]["model"] == "new-model"
+
+
+def test_same_embedding_model_via_gateway_prefix_does_not_reindex(monkeypatch, tmp_path):
+    from app import config, embeddings, notes
+    monkeypatch.setattr(config, "EMBED_MODEL", "ollama-local/nomic-embed-text")
+    note = {"frontmatter": {"title": "t"}, "sections": {"Prayer": "p"}}
+    monkeypatch.setattr(notes, "list_notes", lambda root=None: [{"id": "n1"}])
+    monkeypatch.setattr(notes, "read_note", lambda nid, root=None: note)
+    monkeypatch.setattr(notes, "vault_dir", lambda root=None: tmp_path)
+    h = embeddings._hash(embeddings._note_text(note))
+    embeddings._save({"n1": {"hash": h, "vec": [1.0]}})  # legacy nomic entry
+    async def boom(text, is_query=False):
+        raise AssertionError("should not re-embed")
+    monkeypatch.setattr(embeddings, "_embed", boom)
+    assert asyncio.run(embeddings.ensure_index())["n1"]["vec"] == [1.0]

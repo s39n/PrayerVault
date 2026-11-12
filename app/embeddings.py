@@ -60,6 +60,16 @@ async def _embed(text: str, is_query: bool = False) -> list[float]:
         return r.json()["embedding"]
 
 
+def _base_model(name: str) -> str:
+    """'ollama-local/nomic-embed-text:latest' -> 'nomic-embed-text' (provider prefix and
+    tag don't change the vectors, so they must not force a re-embed)."""
+    return name.split("/")[-1].split(":")[0]
+
+
+def _same_model(stored: str) -> bool:
+    return _base_model(stored) == _base_model(config.EMBED_MODEL)
+
+
 def _cos(a: list[float], b: list[float]) -> float:
     dot = sum(x * y for x, y in zip(a, b))
     na = math.sqrt(sum(x * x for x in a))
@@ -81,7 +91,7 @@ async def ensure_index(root: Path | str | None = None) -> dict:
         entry = index.get(nid, {})
         # Re-embed when the text changed OR the embedding model changed — vectors
         # from different models aren't comparable (and may differ in length).
-        if entry.get("hash") != h or entry.get("model", LEGACY_EMBED_MODEL) != config.EMBED_MODEL:
+        if entry.get("hash") != h or _same_model(entry.get("model", LEGACY_EMBED_MODEL)) is False:
             index[nid] = {"hash": h, "model": config.EMBED_MODEL, "vec": await _embed(text)}
             changed = True
     for nid in list(index):
