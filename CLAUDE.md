@@ -61,7 +61,7 @@ docker compose up -d --build
 
 All config is env vars read in `app/config.py` (see `.env.example`): `AUTH_USERNAME`,
 `AUTH_PASSWORD_HASH` (generate via `scripts/hash_password.py`), `SESSION_SECRET`,
-`OLLAMA_URL`/`OLLAMA_MODEL`/`OLLAMA_TIMEOUT`, `VAULT_DIR`, `COOKIE_SECURE`, and for
+`OLLAMA_URL`/`OLLAMA_MODEL`/`OLLAMA_TIMEOUT`, `LLM_BASE_URL`/`LLM_API_KEY`/`LLM_MODEL` (9router gateway — when set, `ollama_client._chat` and `embeddings._embed` use the OpenAI-compatible API instead of Ollama), `VAULT_DIR`, `COOKIE_SECURE`, and for
 compose: `PRAYERS_DIR` (host vault path) and `DOMAIN` (Caddy). App fails fast at startup
 if secrets are missing. Never commit `.env`.
 

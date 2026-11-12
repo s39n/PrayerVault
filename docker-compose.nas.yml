@@ -16,10 +16,15 @@
 # a secure context, so voice works on https://pray.safile.us (or localhost),
 # not plain http on the LAN — browsers block the mic there.
 #
-# AI: the ollama service runs the language model locally on the NAS (no separate
-# machine needed). The one-shot ollama-pull service downloads the chat + embedding
-# models into a shared volume on first start. On CPU-only hardware keep OLLAMA_MODEL
-# small (gemma3:12b is a good default); an 8B model will be slow without a GPU.
+# AI: chat + embeddings go through the 9router gateway on powertower
+# (LLM_BASE_URL, default http://10.0.0.210:20128/v1). Create a dedicated
+# "prayervault" API key in the 9router dashboard and set LLM_API_KEY — usage and
+# model rules are then tracked per app there. Pick models from the router's
+# /v1/models list via LLM_MODEL / EMBED_MODEL.
+#
+# Fallback: the old on-NAS Ollama is kept under the "local-ai" profile and does not
+# start by default. To use it again: unset LLM_BASE_URL and deploy with
+# COMPOSE_PROFILES=local-ai.
 
 services:
   prayervault:
@@ -28,7 +33,6 @@ services:
     user: "${PUID:-1000}:${PGID:-1000}"
     restart: unless-stopped
     depends_on:
-      - ollama
       - whisper
       - users-init
     environment:
@@ -36,6 +40,10 @@ services:
       - AUTH_USERNAME=${AUTH_USERNAME:-sean}
       - AUTH_PASSWORD_HASH_B64=${AUTH_PASSWORD_HASH_B64:?run scripts/hash_password.py and use the B64 line}
       - SESSION_SECRET=${SESSION_SECRET:?generate with python -c "import secrets; print(secrets.token_hex(32))"}
+      # 9router (OpenAI-compatible). Leave LLM_BASE_URL empty to use OLLAMA_URL.
+      - LLM_BASE_URL=${LLM_BASE_URL-http://10.0.0.210:20128/v1}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_MODEL=${LLM_MODEL:-gc/gemini-2.5-flash}
       - OLLAMA_URL=${OLLAMA_URL:-http://ollama:11434}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma3:12b}
       # Reasoning model support: OLLAMA_THINK=true for qwen3 etc.; cap context so a
@@ -44,6 +52,8 @@ services:
       - OLLAMA_NUM_CTX=${OLLAMA_NUM_CTX:-8192}
       - OLLAMA_TIMEOUT=${OLLAMA_TIMEOUT:-300}
       - EMBED_MODEL=${EMBED_MODEL:-nomic-embed-text:latest}
+      - EMBED_BASE_URL=${EMBED_BASE_URL:-}
+      - EMBED_API_KEY=${EMBED_API_KEY:-}
       - WHISPER_URL=http://whisper:9000
       - NTFY_SERVER=${NTFY_SERVER:-https://ntfy.salife.us}
       # false so login works over plain HTTP on the LAN; external traffic is
@@ -80,6 +90,7 @@ services:
 
   ollama:
     image: ollama/ollama:latest
+    profiles: ["local-ai"]
     restart: unless-stopped
     volumes:
       - ollama_models:/root/.ollama
@@ -97,6 +108,7 @@ services:
   # shared volume. Exits when finished; safe to re-run (pull is a no-op if present).
   ollama-pull:
     image: ollama/ollama:latest
+    profiles: ["local-ai"]
     depends_on:
       - ollama
     restart: "no"

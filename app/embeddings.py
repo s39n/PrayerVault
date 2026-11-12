@@ -1,4 +1,5 @@
-"""Semantic search + related prayers via Ollama embeddings (nomic-embed-text)."""
+"""Semantic search + related prayers via embeddings (Ollama, or an OpenAI-compatible
+gateway such as 9router when EMBED_BASE_URL / LLM_BASE_URL is set)."""
 import hashlib
 import json
 import math
@@ -11,6 +12,8 @@ from . import config, notes
 INDEX_FILE = ".embeddings.json"   # dotfile: invisible in Obsidian, syncs with the vault
 RELATED_THRESHOLD = 0.55
 RELATED_MAX = 3
+# Index entries written before the model was recorded came from this model.
+LEGACY_EMBED_MODEL = "nomic-embed-text:latest"
 
 
 def _index_path(root: Path | str | None = None) -> Path:
@@ -40,7 +43,17 @@ def _hash(text: str) -> str:
 async def _embed(text: str, is_query: bool = False) -> list[float]:
     # nomic-embed-text is trained with task prefixes; using them improves results
     prefix = "search_query: " if is_query else "search_document: "
+    if not config.EMBED_MODEL.split("/")[-1].startswith("nomic"):
+        prefix = ""  # task prefixes are nomic-specific
     async with httpx.AsyncClient(timeout=120) as client:
+        if config.EMBED_BASE_URL:
+            headers = {"Content-Type": "application/json"}
+            if config.EMBED_API_KEY:
+                headers["Authorization"] = f"Bearer {config.EMBED_API_KEY}"
+            r = await client.post(f"{config.EMBED_BASE_URL}/embeddings", headers=headers,
+                                  json={"model": config.EMBED_MODEL, "input": prefix + text})
+            r.raise_for_status()
+            return r.json()["data"][0]["embedding"]
         r = await client.post(f"{config.OLLAMA_URL}/api/embeddings",
                               json={"model": config.EMBED_MODEL, "prompt": prefix + text})
         r.raise_for_status()
@@ -65,8 +78,11 @@ async def ensure_index(root: Path | str | None = None) -> dict:
         note = notes.read_note(nid, root)
         text = _note_text(note)
         h = _hash(text)
-        if index.get(nid, {}).get("hash") != h:
-            index[nid] = {"hash": h, "vec": await _embed(text)}
+        entry = index.get(nid, {})
+        # Re-embed when the text changed OR the embedding model changed — vectors
+        # from different models aren't comparable (and may differ in length).
+        if entry.get("hash") != h or entry.get("model", LEGACY_EMBED_MODEL) != config.EMBED_MODEL:
+            index[nid] = {"hash": h, "model": config.EMBED_MODEL, "vec": await _embed(text)}
             changed = True
     for nid in list(index):
         if nid not in seen:

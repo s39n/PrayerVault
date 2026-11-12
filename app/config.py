@@ -5,6 +5,16 @@ VAULT_DIR = os.environ.get("VAULT_DIR", "/vault")
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://host.docker.internal:11434")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.1:8b")
 EMBED_MODEL = os.environ.get("EMBED_MODEL", "nomic-embed-text:latest")
+# --- OpenAI-compatible gateway (e.g. 9router). When LLM_BASE_URL is set, chat and
+#     embeddings go there (POST {LLM_BASE_URL}/chat/completions and /embeddings)
+#     instead of Ollama's native API. Each app gets its own LLM_API_KEY so the
+#     gateway can track usage and enforce model/limit rules per app. ---
+LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "").rstrip("/")
+LLM_API_KEY = os.environ.get("LLM_API_KEY", "")
+LLM_MODEL = os.environ.get("LLM_MODEL", "") or OLLAMA_MODEL
+EMBED_BASE_URL = os.environ.get("EMBED_BASE_URL", "").rstrip("/") or LLM_BASE_URL
+EMBED_API_KEY = os.environ.get("EMBED_API_KEY", "") or LLM_API_KEY
+USE_GATEWAY = bool(LLM_BASE_URL)
 WHISPER_URL = os.environ.get("WHISPER_URL", "http://whisper:9000")
 SESSION_SECRET = os.environ.get("SESSION_SECRET", "")
 AUTH_USERNAME = os.environ.get("AUTH_USERNAME", "sean")

@@ -137,6 +137,7 @@ All config is env vars read in `app/config.py` (see `.env.example`):
 | `VAULT_DIR` | Admin's prayer folder (the Obsidian vault path in-container) |
 | `USERS_DIR` | Folder for Google users' journals |
 | `OLLAMA_URL`, `OLLAMA_MODEL`, `EMBED_MODEL`, `OLLAMA_TIMEOUT` | Local AI |
+| `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, `EMBED_BASE_URL`, `EMBED_API_KEY` | OpenAI-compatible gateway (e.g. 9router). When `LLM_BASE_URL` is set it replaces Ollama for chat and embeddings; changing `EMBED_MODEL` re-embeds the search index automatically |
 | `WHISPER_URL` | Speech-to-text service |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `PUBLIC_URL` | Google sign-in + Drive backup |
 | `COOKIE_SECURE` | `false` only for plain-HTTP LAN use |

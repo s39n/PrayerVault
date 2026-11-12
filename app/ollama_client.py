@@ -93,8 +93,24 @@ def _shape(raw: dict) -> dict:
     }
 
 
+def _model() -> str:
+    return config.LLM_MODEL if config.USE_GATEWAY else config.OLLAMA_MODEL
+
+
+def _gateway_headers(key: str) -> dict:
+    h = {"Content-Type": "application/json"}
+    if key:
+        h["Authorization"] = f"Bearer {key}"
+    return h
+
+
 async def _chat(messages: list[dict]) -> str:
-    """POST to Ollama's /api/chat and return the reply content, with clear errors."""
+    """Send a chat request and return the reply content, with clear errors.
+
+    Uses the OpenAI-compatible gateway (9router) when LLM_BASE_URL is set,
+    otherwise Ollama's native /api/chat."""
+    if config.USE_GATEWAY:
+        return await _chat_gateway(messages)
     payload = {
         "model": config.OLLAMA_MODEL,
         "stream": False,
@@ -126,6 +142,44 @@ async def _chat(messages: list[dict]) -> str:
         if msg.get("thinking"):
             log.debug("ollama reasoning (%s): %s", config.OLLAMA_MODEL, msg["thinking"][:400])
         return msg.get("content", "")
+
+
+async def _chat_gateway(messages: list[dict]) -> str:
+    """POST to an OpenAI-compatible /chat/completions endpoint (9router)."""
+    payload = {
+        "model": config.LLM_MODEL,
+        "stream": False,
+        "temperature": 0.6,
+        "response_format": {"type": "json_object"},
+        "messages": messages,
+    }
+    url = f"{config.LLM_BASE_URL}/chat/completions"
+    async with httpx.AsyncClient(timeout=config.OLLAMA_TIMEOUT) as client:
+        try:
+            r = await client.post(url, json=payload,
+                                  headers=_gateway_headers(config.LLM_API_KEY))
+        except httpx.TimeoutException as e:
+            raise OllamaError(
+                f"Model '{config.LLM_MODEL}' didn't respond within {config.OLLAMA_TIMEOUT}s "
+                f"via {config.LLM_BASE_URL}. Raise OLLAMA_TIMEOUT or pick a faster model."
+            ) from e
+        except httpx.HTTPError as e:
+            raise OllamaError(f"Can't reach the AI gateway at {config.LLM_BASE_URL}: {e}") from e
+        if r.status_code in (401, 403):
+            raise OllamaError(
+                "The AI gateway rejected the API key. Check LLM_API_KEY "
+                "(create a key for this app in the 9router dashboard)."
+            )
+        if r.status_code == 404:
+            raise OllamaError(
+                f"Model '{config.LLM_MODEL}' was not found on the AI gateway at "
+                f"{config.LLM_BASE_URL}. Set LLM_MODEL to a model id from its /v1/models list."
+            )
+        if r.status_code == 429:
+            raise OllamaError("The AI gateway's usage limit for this app was reached. Try later.")
+        r.raise_for_status()
+        choices = r.json().get("choices") or [{}]
+        return (choices[0].get("message") or {}).get("content") or ""
 
 
 def _parse_json(content: str) -> dict:
@@ -193,12 +247,24 @@ async def draft_checkin(subject: str, title: str, context: str) -> str:
 
 
 async def health() -> dict:
+    if config.USE_GATEWAY:
+        try:
+            async with httpx.AsyncClient(timeout=5) as client:
+                r = await client.get(f"{config.LLM_BASE_URL}/models",
+                                     headers=_gateway_headers(config.LLM_API_KEY))
+                r.raise_for_status()
+                models = [m.get("id", "") for m in r.json().get("data", [])]
+            return {"ollama": "ok", "provider": "gateway", "model": config.LLM_MODEL,
+                    "model_available": config.LLM_MODEL in models}
+        except Exception as e:
+            return {"ollama": "unreachable", "provider": "gateway",
+                    "model": config.LLM_MODEL, "error": str(e)}
     try:
         async with httpx.AsyncClient(timeout=5) as client:
             r = await client.get(f"{config.OLLAMA_URL}/api/tags")
             r.raise_for_status()
             models = [m["name"] for m in r.json().get("models", [])]
-        return {"ollama": "ok", "model": config.OLLAMA_MODEL,
+        return {"ollama": "ok", "provider": "ollama", "model": config.OLLAMA_MODEL,
                 "model_available": any(m.startswith(config.OLLAMA_MODEL.split(":")[0]) for m in models)}
     except Exception as e:
-        return {"ollama": "unreachable", "model": config.OLLAMA_MODEL, "error": str(e)}
+        return {"ollama": "unreachable", "provider": "ollama", "model": config.OLLAMA_MODEL, "error": str(e)}
