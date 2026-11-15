@@ -109,7 +109,10 @@
     dpr = Math.min(window.devicePixelRatio || 1, 2);
     W = Math.floor(window.innerWidth * dpr); H = Math.floor(window.innerHeight * dpr);
     cv.width = W; cv.height = H; gl.viewport(0, 0, W, H);
-    avgW = Math.min(Math.max(window.innerWidth * 0.18, 52), 150);        // narrower on desktop, phone unchanged
+    avgW = Math.min(Math.max(window.innerWidth * 0.18, 52), 150);        // narrower on desktop
+    // Phones: once signed in, the veil draws back to a thin edge so the journal
+    // gets the width. The sign-in screen keeps the full curtain.
+    if (window.innerWidth <= 700 && !document.body.classList.contains("logged-out")) avgW = 30;
     meshW = avgW / EDGE * dpr; meshH = window.innerHeight * 1.08 * dpr;
     var ribs = Math.min(Math.max(avgW * 0.121, 7), 40);                  // consistent rib thickness
     var img = bake(diffPx, norPx, ribs, meshH / TH);
@@ -143,6 +146,11 @@
     document.body.classList.add("veil-gl-on");                          // reveal canvas, hide SVG veils
     raf = window.requestAnimationFrame(frame);
     var rt; window.addEventListener("resize", function () { clearTimeout(rt); rt = setTimeout(layout, 150); });
+    var wasOut = document.body.classList.contains("logged-out");
+    new MutationObserver(function () {                                  // re-lay when signing in or out
+      var out = document.body.classList.contains("logged-out");
+      if (out !== wasOut) { wasOut = out; layout(); }
+    }).observe(document.body, { attributes: true, attributeFilter: ["class"] });
     document.addEventListener("visibilitychange", function () {
       if (document.hidden) { running = false; if (raf) window.cancelAnimationFrame(raf); }
       else if (!running) { running = true; raf = window.requestAnimationFrame(frame); }
