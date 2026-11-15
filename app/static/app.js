@@ -3,6 +3,14 @@ const $ = (id) => document.getElementById(id);
 const views = ["login-view", "today-view", "list-view", "people-view", "fruit-view", "ask-view", "dictate-view", "you-view", "detail-view", "new-view"];
 let filterStatus = "ongoing";
 let pollTimer = null;
+// Where "Back" returns to: whichever list-style view the reader came from.
+let backTarget = null;
+function goBack() { (backTarget || renderList)(); }
+
+function dayPart() {
+  const h = new Date().getHours();
+  return h < 12 ? "morning" : h < 18 ? "afternoon" : "evening";
+}
 
 function show(view) {
   views.forEach((v) => $(v).classList.toggle("hidden", v !== view));
@@ -76,6 +84,7 @@ const aiBadge = (ai) =>
 async function renderList() {
   show("list-view");
   setNav("prayers");
+  backTarget = renderList;
   const items = await api("/api/prayers");
   const filtered = items.filter((i) => filterStatus === "all" || i.status === filterStatus);
   const chips = ["ongoing", "answered", "all"].map((f) =>
@@ -119,6 +128,7 @@ async function renderList() {
 
 async function renderSearch(q) {
   show("list-view");
+  backTarget = () => renderSearch(q);
   let results;
   try { results = await api("/api/search?q=" + encodeURIComponent(q)); }
   catch (e) { $("list-view").innerHTML = `<p class="meta">${esc(e.message)}</p><button class="link" id="btn-back3">&larr; Back</button>`;
@@ -215,6 +225,7 @@ function greeting() {
 async function renderToday() {
   show("today-view");
   setNav("today");
+  backTarget = renderToday;
   const items = await api("/api/prayers");
   let followups = [];
   try { followups = await api("/api/follow-up"); } catch (e) { /* nudge is best-effort */ }
@@ -232,10 +243,10 @@ async function renderToday() {
     <div class="hero" data-id="${esc(featured.id)}">
       <div class="eyebrow">A word is needed</div>
       <h2>${esc(featured.title)}</h2>
-      <p>Carry this one back into the light this morning.</p>
+      <p>Carry this one back into the light this ${dayPart()}.</p>
       <button class="link" style="font-size:1rem">Open &rarr;</button>
     </div>
-    <div class="next-step">The step before you now: sit with this prayer for a moment before the day begins.</div>`
+    <div class="next-step">The step before you now: sit with this prayer for a moment ${{ morning: "before the day begins", afternoon: "before the day moves on", evening: "before the day closes" }[dayPart()]}.</div>`
     : (answered.length
       ? `<div class="next-step">No prayers are waiting on you today. Visit <strong>Fruit</strong> to remember how God has answered.</div>`
       : `<div class="next-step">Nothing is on your heart here yet. When you're ready, bring a matter into the light.</div>
@@ -275,6 +286,7 @@ async function renderToday() {
 async function renderFruit() {
   show("fruit-view");
   setNav("fruit");
+  backTarget = renderFruit;
   const items = await api("/api/prayers");
   const answered = items.filter((i) => i.status === "answered")
     .sort((a, b) => String(b.answered_date || b.date).localeCompare(String(a.answered_date || a.date)));
@@ -854,6 +866,34 @@ function openModal() {
   return { close: () => overlay.remove(), box };
 }
 
+// A small text prompt in the app's own style. Cancel (or tapping outside)
+// closes it without calling onSave.
+function textModal({ title, hint, placeholder, saveLabel, required, onSave }) {
+  const m = openModal();
+  m.box.innerHTML = `
+    <h3>${esc(title)}</h3>
+    ${hint ? `<p class="meta">${esc(hint)}</p>` : ""}
+    <textarea id="tm-text" placeholder="${esc(placeholder || "")}"></textarea>
+    <div class="error-msg" id="tm-err"></div>
+    <div class="row" style="margin-top:12px">
+      <button class="primary" id="tm-save">${esc(saveLabel)}</button>
+      <button class="link" id="tm-cancel">Cancel</button>
+    </div>`;
+  const ta = m.box.querySelector("#tm-text");
+  const save = m.box.querySelector("#tm-save");
+  const err = m.box.querySelector("#tm-err");
+  ta.focus();
+  m.box.querySelector("#tm-cancel").addEventListener("click", m.close);
+  save.addEventListener("click", async () => {
+    const val = ta.value.trim();
+    err.textContent = "";
+    if (required && !val) { err.textContent = "Write a few words first."; return; }
+    save.disabled = true;
+    try { await onSave(val); m.close(); }
+    catch (e) { err.textContent = e.message; save.disabled = false; }
+  });
+}
+
 async function draftCheckInModal(pid, who, refresh) {
   const m = openModal();
   m.box.innerHTML = `<h3>Draft check-in</h3><p class="meta"><span class="spinner"></span> Asking your local AI…</p>`;
@@ -971,7 +1011,7 @@ async function renderDetail(id) {
         <select id="detail-family" style="flex:1;max-width:280px"><option value="">— none —</option></select>
       </div>
     </div>`;
-  $("btn-back").addEventListener("click", renderList);
+  $("btn-back").addEventListener("click", goBack);
   loadFamilyOptions("detail-family", fm.family);
   $("detail-family").addEventListener("change", async (e) => {
     try {
@@ -982,21 +1022,31 @@ async function renderDetail(id) {
   $("detail-view").querySelectorAll(".rel-link").forEach((a) =>
     a.addEventListener("click", () => renderDetail(a.dataset.id)));
   const btnA = $("btn-answered"), btnR = $("btn-reopen"), btnU = $("btn-update"), btnG = $("btn-regen");
-  if (btnA) btnA.addEventListener("click", async () => {
-    const t = prompt("How was this prayer answered? (optional)") ?? "";
-    await api(`/api/prayers/${encodeURIComponent(id)}/answered`, { method: "POST", body: JSON.stringify({ text: t }) });
-    renderDetail(id);
-  });
+  if (btnA) btnA.addEventListener("click", () => textModal({
+    title: "Mark answered",
+    hint: "How was this prayer answered? You can leave this blank.",
+    placeholder: "e.g. The surgery went well and she is home resting",
+    saveLabel: "Mark answered",
+    onSave: async (t) => {
+      await api(`/api/prayers/${encodeURIComponent(id)}/answered`, { method: "POST", body: JSON.stringify({ text: t }) });
+      renderDetail(id);
+    },
+  }));
   if (btnR) btnR.addEventListener("click", async () => {
     await api(`/api/prayers/${encodeURIComponent(id)}/reopen`, { method: "POST", body: JSON.stringify({ text: "" }) });
     renderDetail(id);
   });
-  if (btnU) btnU.addEventListener("click", async () => {
-    const t = prompt("Update:");
-    if (!t) return;
-    await api(`/api/prayers/${encodeURIComponent(id)}/updates`, { method: "POST", body: JSON.stringify({ text: t }) });
-    renderDetail(id);
-  });
+  if (btnU) btnU.addEventListener("click", () => textModal({
+    title: "Add update",
+    hint: "What has happened since you last prayed about this?",
+    placeholder: "e.g. Second interview scheduled for Friday",
+    saveLabel: "Save update",
+    required: true,
+    onSave: async (t) => {
+      await api(`/api/prayers/${encodeURIComponent(id)}/updates`, { method: "POST", body: JSON.stringify({ text: t }) });
+      renderDetail(id);
+    },
+  }));
   if (btnG) btnG.addEventListener("click", async () => {
     await api(`/api/prayers/${encodeURIComponent(id)}/regenerate`, { method: "POST", body: JSON.stringify({}) });
     renderDetail(id);
@@ -1041,7 +1091,7 @@ function renderNew(initialText = "") {
       <div class="error-msg" id="np-error"></div>
       <button class="primary" id="np-save" style="margin-top:6px">Save &amp; seek Scripture</button>
     </div>`;
-  $("btn-back2").addEventListener("click", renderList);
+  $("btn-back2").addEventListener("click", goBack);
   $("np-type").addEventListener("change", (e) =>
     $("np-who-wrap").classList.toggle("hidden", e.target.value !== "request"));
   loadFamilyOptions("np-family");
@@ -1114,6 +1164,8 @@ async function loadFamilyOptions(selectId, selected) {
 
 async function renderPeople() {
   show("people-view");
+  setNav("people");
+  backTarget = renderPeople;
   $("people-view").innerHTML = `
     <div class="greeting"><span class="eyebrow">Prayer for</span><h2>People &amp; Families</h2></div>
     <div class="card">
@@ -1159,6 +1211,8 @@ async function loadFamilies() {
 
 async function renderFamily(id) {
   show("people-view");
+  setNav("people");
+  backTarget = () => renderFamily(id);
   $("people-view").innerHTML = `<p class="meta" style="text-align:center">Loading…</p>`;
   let data;
   try { data = await api("/api/families/" + encodeURIComponent(id)); }
