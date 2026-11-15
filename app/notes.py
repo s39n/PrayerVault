@@ -141,6 +141,53 @@ def list_notes(root: Path | str | None = None) -> list[dict]:
     return out
 
 
+TRASH_DIR = ".trash"
+
+
+def edit_note(note_id: str, title: str | None = None, text: str | None = None,
+              requested_by: str | None = None, root: Path | str | None = None) -> None:
+    """Edit the words of a prayer in place.
+
+    The file is never renamed, so the note id and every link that points at it
+    (Related sections, Obsidian backlinks) keep working. Only the frontmatter
+    title / requested-by and the ``## Prayer`` section change; AI sections and the
+    Updates timeline are left as they are.
+    """
+    note = read_note(note_id, root)
+    fm, sections = note["frontmatter"], note["sections"]
+    if title is not None and title.strip():
+        fm["title"] = re.sub(r"\s+", " ", title).strip()[:120]
+    if text is not None and text.strip():
+        sections["Prayer"] = text.strip()
+    if requested_by is not None:
+        who = re.sub(r"\s+", " ", requested_by).strip()[:120]
+        if who:
+            fm["requested-by"] = who
+        else:
+            fm.pop("requested-by", None)
+    write_note(note_id, fm, sections, root)
+
+
+def trash_note(note_id: str, root: Path | str | None = None) -> None:
+    """Take a prayer out of the journal without erasing it.
+
+    The file is moved into a ``.trash`` folder beside the notes. ``list_notes``
+    only looks at the top level, so it disappears from the app (and from search
+    and exports) but can be restored by moving the file back.
+    """
+    path = _safe_path(note_id, root)
+    if not path.exists():
+        raise FileNotFoundError(note_id)
+    trash = path.parent / TRASH_DIR
+    trash.mkdir(exist_ok=True)
+    dest = trash / path.name
+    n = 2
+    while dest.exists():
+        dest = trash / f"{path.stem} {n}.md"
+        n += 1
+    path.replace(dest)
+
+
 def set_family(note_id: str, family_id: str, root: Path | str | None = None) -> None:
     """Attach the note to a family (or clear it when family_id is empty)."""
     note = read_note(note_id, root)

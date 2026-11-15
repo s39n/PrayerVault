@@ -199,6 +199,12 @@ class NewPrayer(BaseModel):
     family: str = Field(default="", max_length=60)
 
 
+class EditPrayer(BaseModel):
+    title: str = Field(min_length=1, max_length=120)
+    text: str = Field(min_length=1, max_length=20000)
+    requested_by: str = Field(default="", max_length=120)
+
+
 class TextBody(BaseModel):
     text: str = Field(default="", max_length=5000)
 
@@ -253,6 +259,27 @@ def _get_or_404(note_id: str, root=None) -> dict:
 @app.get("/api/prayers/{note_id}")
 async def get_prayer(note_id: str, user: str = Depends(auth.require_auth)):
     return _get_or_404(note_id, users.vault_for(user))
+
+
+@app.put("/api/prayers/{note_id}")
+async def edit_prayer(note_id: str, body: EditPrayer,
+                      user: str = Depends(auth.require_auth)):
+    """Fix the title, the wording, or who it's for. The note keeps its id."""
+    if not body.title.strip() or not body.text.strip():
+        raise HTTPException(422, "A title and the prayer itself are both needed")
+    root = users.vault_for(user)
+    _get_or_404(note_id, root)
+    notes.edit_note(note_id, body.title, body.text, body.requested_by, root=root)
+    return {"ok": True}
+
+
+@app.delete("/api/prayers/{note_id}")
+async def delete_prayer(note_id: str, user: str = Depends(auth.require_auth)):
+    """Remove a prayer from the journal (moved to .trash, never erased)."""
+    root = users.vault_for(user)
+    _get_or_404(note_id, root)
+    notes.trash_note(note_id, root=root)
+    return {"ok": True}
 
 
 @app.post("/api/prayers/{note_id}/answered")

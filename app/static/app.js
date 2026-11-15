@@ -997,6 +997,62 @@ function logOutreachModal(pid, who, refresh) {
   });
 }
 
+// ---------- Edit / remove ----------
+function editPrayerModal(id, fm, prayerText) {
+  const m = openModal();
+  const showWho = fm.type === "request" || fm["requested-by"];
+  m.box.innerHTML = `
+    <h3>Edit prayer</h3>
+    <label>Title</label><input id="ep-title">
+    ${showWho ? '<label>Requested by / for</label><input id="ep-who">' : ""}
+    <label>Prayer</label><textarea id="ep-text" style="min-height:180px"></textarea>
+    <div class="error-msg" id="ep-err"></div>
+    <div class="row" style="margin-top:12px">
+      <button class="primary" id="ep-save">Save</button>
+      <button class="link" id="ep-cancel">Cancel</button>
+    </div>`;
+  const q = (sel) => m.box.querySelector(sel);
+  q("#ep-title").value = fm.title || "";
+  if (showWho) q("#ep-who").value = fm["requested-by"] || "";
+  q("#ep-text").value = prayerText;
+  q("#ep-cancel").addEventListener("click", m.close);
+  q("#ep-save").addEventListener("click", async () => {
+    const title = q("#ep-title").value.trim(), text = q("#ep-text").value.trim();
+    q("#ep-err").textContent = "";
+    if (!title || !text) { q("#ep-err").textContent = "A title and the prayer itself are both needed."; return; }
+    q("#ep-save").disabled = true;
+    try {
+      await api("/api/prayers/" + encodeURIComponent(id), { method: "PUT", body: JSON.stringify({
+        title, text, requested_by: showWho ? q("#ep-who").value.trim() : "",
+      }) });
+      m.close();
+      toast(text !== prayerText.trim()
+        ? "Saved. The Scripture and reflection still answer the earlier wording — Regenerate under More if you'd like them refreshed."
+        : "Saved.");
+      renderDetail(id);
+    } catch (e) { q("#ep-err").textContent = e.message; q("#ep-save").disabled = false; }
+  });
+}
+
+function removePrayerModal(id, title) {
+  const m = openModal();
+  m.box.innerHTML = `
+    <h3>Remove this prayer?</h3>
+    <p class="meta">“${esc(title)}” will leave your journal. It is moved to a trash folder beside your notes, not erased.</p>
+    <div class="error-msg" id="rp-err"></div>
+    <div class="row" style="margin-top:12px">
+      <button id="rp-go" class="danger-btn">Remove</button>
+      <button class="link" id="rp-cancel">Keep it</button>
+    </div>`;
+  m.box.querySelector("#rp-cancel").addEventListener("click", m.close);
+  m.box.querySelector("#rp-go").addEventListener("click", async () => {
+    try {
+      await api("/api/prayers/" + encodeURIComponent(id), { method: "DELETE" });
+      m.close(); toast("Prayer removed."); goBack();
+    } catch (e) { m.box.querySelector("#rp-err").textContent = e.message; }
+  });
+}
+
 // ---------- Detail ----------
 function relatedHtml(s) {
   if (!s["Related"]) return "";
@@ -1032,16 +1088,23 @@ async function renderDetail(id) {
           ? '<button class="primary" id="btn-answered">Mark answered</button>'
           : '<button id="btn-reopen">Reopen</button>'}
         <button id="btn-update">Add update</button>
-        ${fm.ai !== "pending" ? '<button id="btn-regen">Regenerate response</button>' : ""}
+        <button id="btn-more" aria-expanded="false" aria-controls="more-panel">More</button>
       </div>
-      ${(fm.type === "request" || fm["requested-by"] || fm.family) ? `
-      <div class="row" style="margin-top:10px">
-        <button id="btn-checkin">Draft check-in</button>
-        <button id="btn-outreach">Log outreach</button>
-      </div>` : ""}
-      <div class="row" style="margin-top:12px;align-items:center;gap:8px">
-        <span class="eyebrow">File under</span>
-        <select id="detail-family" style="flex:1;max-width:280px"><option value="">— none —</option></select>
+      <div id="more-panel" class="more-panel hidden">
+        <div class="row">
+          <button id="btn-edit">Edit</button>
+          ${fm.ai !== "pending" ? '<button id="btn-regen">Regenerate response</button>' : ""}
+          ${(fm.type === "request" || fm["requested-by"] || fm.family) ? `
+          <button id="btn-checkin">Draft check-in</button>
+          <button id="btn-outreach">Log outreach</button>` : ""}
+        </div>
+        <div class="row" style="margin-top:12px;align-items:center;gap:8px">
+          <span class="eyebrow">File under</span>
+          <select id="detail-family" style="flex:1;max-width:280px"><option value="">— none —</option></select>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <button class="link danger-link" id="btn-remove">Remove this prayer</button>
+        </div>
       </div>
     </div>`;
   $("btn-back").addEventListener("click", goBack);
@@ -1088,6 +1151,13 @@ async function renderDetail(id) {
   const who = fm["requested-by"] || fm.title;
   if (btnC) btnC.addEventListener("click", () => draftCheckInModal(id, who, () => renderDetail(id)));
   if (btnO) btnO.addEventListener("click", () => logOutreachModal(id, who, () => renderDetail(id)));
+  $("btn-more").addEventListener("click", () => {
+    const open = $("more-panel").classList.toggle("hidden") === false;
+    $("btn-more").setAttribute("aria-expanded", String(open));
+    $("btn-more").textContent = open ? "Less" : "More";
+  });
+  $("btn-edit").addEventListener("click", () => editPrayerModal(id, fm, s["Prayer"] || ""));
+  $("btn-remove").addEventListener("click", () => removePrayerModal(id, fm.title));
   if (pending && !pollTimer) {
     pollTimer = setInterval(async () => {
       const fresh = await api("/api/prayers/" + encodeURIComponent(id));

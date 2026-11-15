@@ -364,3 +364,44 @@ def test_export_zip():
     assert r.headers["content-type"] == "application/zip"
     z = zipfile.ZipFile(io.BytesIO(r.content))
     assert all(n.endswith(".md") for n in z.namelist())
+
+
+def test_edit_keeps_id_and_links(monkeypatch):
+    async def fake_generate(kind, title, text, requested_by=""):
+        return ollama_client._shape(FAKE_AI)
+
+    monkeypatch.setattr(ollama_client, "generate", fake_generate)
+    client.post("/api/login", json={"username": "sean", "password": "testpass"})
+    nid = client.post("/api/prayers", json={
+        "type": "request", "title": "Helth for Tom", "text": "Pray for Tom.",
+        "requested_by": "Tom"}).json()["id"]
+
+    r = client.put(f"/api/prayers/{nid}", json={
+        "title": "Health for Tom", "text": "Pray for Tom's recovery.", "requested_by": "Tom B."})
+    assert r.status_code == 200
+    n = client.get(f"/api/prayers/{nid}").json()          # same id, same file
+    assert n["frontmatter"]["title"] == "Health for Tom"
+    assert n["frontmatter"]["requested-by"] == "Tom B."
+    assert n["sections"]["Prayer"] == "Pray for Tom's recovery."
+    assert "Scripture" in n["sections"] and "Created" in n["sections"]["Updates"]
+    assert (notes.vault_dir() / f"{nid}.md").exists()
+
+    assert client.put(f"/api/prayers/{nid}", json={"title": "  ", "text": "x"}).status_code == 422
+    assert client.put("/api/prayers/2020-01-01 Nope", json={"title": "a", "text": "b"}).status_code == 404
+
+
+def test_remove_moves_to_trash_not_erased(monkeypatch):
+    async def fake_generate(kind, title, text, requested_by=""):
+        return ollama_client._shape(FAKE_AI)
+
+    monkeypatch.setattr(ollama_client, "generate", fake_generate)
+    client.post("/api/login", json={"username": "sean", "password": "testpass"})
+    nid = client.post("/api/prayers", json={
+        "type": "prayer", "title": "Entered by mistake", "text": "Oops."}).json()["id"]
+
+    assert client.delete(f"/api/prayers/{nid}").status_code == 200
+    assert client.get(f"/api/prayers/{nid}").status_code == 404
+    assert all(i["id"] != nid for i in client.get("/api/prayers").json())
+    assert not (notes.vault_dir() / f"{nid}.md").exists()
+    assert (notes.vault_dir() / notes.TRASH_DIR / f"{nid}.md").exists()   # kept, not erased
+    assert client.delete(f"/api/prayers/{nid}").status_code == 404

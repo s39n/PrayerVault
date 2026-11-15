@@ -24,6 +24,8 @@ back up to their own Google Drive.
   and How to Pray sections. Prayers never leave your server.
 - **Requests & answers** — track who asked, add dated updates, mark prayers
   answered, and revisit them in the **Fruit** tab.
+- **Edit & remove** — fix a title or the wording without breaking links (the
+  file is never renamed); removed prayers move to a `.trash` folder, never erased.
 - **Ask** — Scripture Q&A against the same local model.
 - **Semantic search & related prayers** — local embeddings link similar prayers
   together and power search.
