@@ -26,10 +26,12 @@ body{
     linear-gradient(180deg, var(--bg2) 0%, var(--bg) 100%);
   background-attachment:fixed;min-height:100vh;
 }
-.topbar{position:sticky;top:0;z-index:5;
+.topbar{position:sticky;top:0;z-index:5;border-bottom:1px solid rgba(214,201,173,.45)}
+/* The frost sits on a pseudo-element so the bar itself doesn't trap the
+   phone tab bar (a backdrop-filter parent would anchor position:fixed to it). */
+.topbar::before{content:"";position:absolute;inset:0;z-index:-1;
   background:linear-gradient(180deg,rgba(250,245,232,.78),rgba(245,239,225,.64));
-  backdrop-filter:blur(14px) saturate(1.15);-webkit-backdrop-filter:blur(14px) saturate(1.15);
-  border-bottom:1px solid rgba(214,201,173,.45)}
+  backdrop-filter:blur(14px) saturate(1.15);-webkit-backdrop-filter:blur(14px) saturate(1.15)}
 header{display:flex;align-items:center;justify-content:space-between;padding:14px 22px}
 header h1{font-size:1.15rem;margin:0;font-weight:normal;letter-spacing:2px;text-transform:uppercase;color:var(--accent-dark);white-space:nowrap;
   text-shadow:0 0 10px rgba(255,252,240,.95),0 0 22px rgba(255,252,240,.8),0 0 38px rgba(255,250,235,.6)}
@@ -128,6 +130,31 @@ nav#nav,main{position:relative;z-index:1}
   #header-actions{gap:6px}
   #header-actions button{padding:7px 12px;font-size:.85rem}
   #header-actions button.link{padding:7px 4px}
+}
+
+/* You: links to Ask / Dictate */
+.more-card{padding:6px 22px}
+.more-row{display:flex;width:100%;justify-content:space-between;align-items:center;gap:12px;text-align:left;border:none;border-radius:0;background:none;padding:14px 0;color:var(--accent-dark)}
+.more-row + .more-row{border-top:1px solid var(--line)}
+.more-row:hover{color:var(--gold-ink)}
+.more-title{display:block;font-size:1.05rem;color:var(--ink)}
+.nav-ico{display:none}
+@media (min-width:701px){.phone-only{display:none!important}}
+/* Phones: the five main places move to a bar within thumb's reach. */
+@media (max-width:700px){
+  .desktop-only{display:none!important}
+  nav#nav{position:fixed;left:0;right:0;bottom:0;z-index:6;gap:0;flex-wrap:nowrap;justify-content:space-around;
+    padding:0 6px env(safe-area-inset-bottom);
+    background:linear-gradient(180deg,rgba(250,245,232,.9),rgba(245,239,225,.95));
+    backdrop-filter:blur(14px) saturate(1.15);-webkit-backdrop-filter:blur(14px) saturate(1.15);
+    border-top:1px solid rgba(214,201,173,.6)}
+  .nav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;min-height:56px;justify-content:center;
+    padding:7px 2px 6px;font-size:.74rem;letter-spacing:.6px;border-bottom:none;border-top:2px solid transparent}
+  .nav-item:hover{border-color:transparent}
+  .nav-item.active{border-color:var(--gold)}
+  .nav-ico{display:block;width:22px;height:22px}
+  main{padding-bottom:110px}
+  .toast{bottom:84px}
 }
 
 /* Dictation interface styling */
@@ -295,17 +322,16 @@ nav#nav,main{position:relative;z-index:1}
   <h1>Prayer<em>Vault</em></h1>
   <div id="header-actions" class="hidden">
     <button id="btn-new" class="primary">+ New Prayer</button>
-    <button id="btn-logout" class="link">Sign out</button>
+    <button id="btn-logout" class="link desktop-only">Sign out</button>
   </div>
 </header>
-<nav id="nav" class="hidden">
-  <button class="nav-item" data-nav="today">Today</button>
-  <button class="nav-item" data-nav="prayers">Prayers</button>
-  <button class="nav-item" data-nav="people">People</button>
-  <button class="nav-item" data-nav="fruit">Fruit</button>
-  <button class="nav-item" data-nav="ask">Ask</button>
-  <button class="nav-item" data-nav="dictate">Dictate</button>
-  <button class="nav-item" data-nav="you">You</button>
+<nav id="nav" class="hidden" aria-label="Main">
+  <button class="nav-item" data-nav="today"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4"/></svg><span>Today</span></button>
+  <button class="nav-item" data-nav="prayers"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6.5C10 5 7 4.5 4 5v13c3-.5 6 0 8 1.5 2-1.5 5-2 8-1.5V5c-3-.5-6 0-8 1.5z"/><path d="M12 6.5v13"/></svg><span>Prayers</span></button>
+  <button class="nav-item" data-nav="people"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="9" r="3"/><path d="M3.5 19c.6-3 2.8-4.5 5.5-4.5s4.9 1.5 5.5 4.5"/><circle cx="17" cy="8" r="2.3"/><path d="M16.5 13.6c2.2.2 3.6 1.6 4 3.9"/></svg><span>People</span></button>
+  <button class="nav-item" data-nav="fruit"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21v-9"/><path d="M12 12c0-4 2.5-7 7-7 0 4.5-2.5 7-7 7z"/><path d="M12 15c0-3-2-5-6-5 0 3.5 2 5 6 5z"/></svg><span>Fruit</span></button>
+  <button class="nav-item desktop-only" data-nav="ask"><span>Ask</span></button>
+  <button class="nav-item" data-nav="you"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9" r="3.5"/><path d="M5 20c.8-3.6 3.5-5.5 7-5.5s6.2 1.9 7 5.5"/></svg><span>You</span></button>
 </nav>
 </div>
 <main>
@@ -345,7 +371,7 @@ nav#nav,main{position:relative;z-index:1}
   <div id="detail-view" class="hidden"></div>
   <div id="new-view" class="hidden"></div>
 </main>
-<script src="/app.js?v=7"></script>
+<script src="/app.js?v=8"></script>
 <script src="/veil.js?v=3"></script>
 </body>
 </html>

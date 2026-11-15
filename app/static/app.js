@@ -24,9 +24,13 @@ function show(view) {
   }
 }
 
+// On phones the bar holds five places; Ask and Dictate live under You there,
+// so You stays lit while either is open.
+const PHONE = window.matchMedia("(max-width:700px)");
 function setNav(name) {
+  const underYou = name === "dictate" || (name === "ask" && PHONE.matches);
   document.querySelectorAll(".nav-item").forEach((b) =>
-    b.classList.toggle("active", b.dataset.nav === name));
+    b.classList.toggle("active", b.dataset.nav === name || (underYou && b.dataset.nav === "you")));
 }
 
 function longestWaiting(items) {
@@ -313,6 +317,7 @@ function renderAsk() {
   show("ask-view");
   setNav("ask");
   $("ask-view").innerHTML = `
+    <button class="link phone-only" id="ask-back">&larr; You</button>
     <div class="greeting">
       <span class="eyebrow">Ask</span>
       <h2>Bring a question to Scripture</h2>
@@ -324,6 +329,7 @@ function renderAsk() {
       <button class="primary" id="ask-go" style="margin-top:6px">Seek an answer</button>
     </div>
     <div id="ask-result"></div>`;
+  $("ask-back").addEventListener("click", renderYou);
   $("ask-go").addEventListener("click", doAsk);
   $("ask-q").addEventListener("keydown", (e) => {
     if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) doAsk();
@@ -370,6 +376,7 @@ async function renderDictate() {
   setNav("dictate");
   
   $("dictate-view").innerHTML = `
+    <button class="link" id="dictate-back">&larr; You</button>
     <div class="greeting">
       <span class="eyebrow">Dictate</span>
       <h2>Speech to Text</h2>
@@ -711,6 +718,7 @@ async function renderDictate() {
     toast("Download started.");
   });
 
+  $("dictate-back").addEventListener("click", renderYou);
   $("dictate-btn-new-prayer").addEventListener("click", () => {
     const text = dictateText.value;
     if (!text) { toast("Write or dictate some text first."); return; }
@@ -719,6 +727,27 @@ async function renderDictate() {
 }
 
 // ---------- You (settings) ----------
+// Ask and Dictate are reached from here: Ask on phones (it has its own tab on
+// wider screens), Dictate everywhere for the admin.
+function moreCard(me) {
+  const row = (id, title, hint, cls = "") => `
+    <button class="more-row ${cls}" id="${id}">
+      <span><span class="more-title">${title}</span><span class="meta">${hint}</span></span>
+      <span aria-hidden="true">&rarr;</span>
+    </button>`;
+  return `<div class="card more-card ${me.admin ? "" : "phone-only"}">
+    ${row("more-ask", "Ask", "Bring a question to Scripture", "phone-only")}
+    ${me.admin ? row("more-dictate", "Dictate", "Speak, and have it written down") : ""}
+  </div>`;
+}
+const SIGN_OUT_ROW = `<div class="row phone-only" style="justify-content:center;margin-top:8px"><button id="you-logout">Sign out</button></div>`;
+function wireMore() {
+  const a = $("more-ask"), d = $("more-dictate"), o = $("you-logout");
+  if (a) a.addEventListener("click", renderAsk);
+  if (d) d.addEventListener("click", renderDictate);
+  if (o) o.addEventListener("click", doLogout);
+}
+
 async function renderYou() {
   show("you-view");
   setNav("you");
@@ -743,11 +772,13 @@ async function renderYou() {
   if (!me.admin) {
     $("you-view").innerHTML = `
       <div class="greeting"><span class="eyebrow">You</span><h2>${esc(me.name || "Your account")}</h2></div>
+      ${moreCard(me)}
       <div class="card">
         <div class="section-title">Account</div>
         <p class="meta">Signed in with Google${me.email ? " as " + esc(me.email) : ""}. Your prayer journal is private to you.</p>
-      </div>` + backupCard;
+      </div>` + backupCard + SIGN_OUT_ROW;
     wireImport();
+    wireMore();
     return;
   }
   let s;
@@ -762,6 +793,7 @@ async function renderYou() {
     `<option value="${i}" ${i === sel ? "selected" : ""}>${String(i).padStart(2, "0")}</option>`).join("");
   $("you-view").innerHTML = `
     <div class="greeting"><span class="eyebrow">You</span><h2>Settings</h2></div>
+    ${moreCard(me)}
     <div class="card">
       <div class="section-title">Morning prayer prompt</div>
       <label style="text-transform:none;letter-spacing:0;color:var(--ink);margin-top:6px">
@@ -804,8 +836,9 @@ async function renderYou() {
         <button id="pr-reset">Reset to built-in</button>
         <span id="pr-status" class="meta"></span>
       </div>
-    </div>` + backupCard;
+    </div>` + backupCard + SIGN_OUT_ROW;
   wireImport();
+  wireMore();
   const gather = () => ({ morning: {
     enabled: $("mp-enabled").checked,
     delivery: $("mp-delivery").value,
@@ -1265,7 +1298,8 @@ async function doLogin() {
 $("btn-login").addEventListener("click", doLogin);
 $("login-pass").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
 $("btn-new").addEventListener("click", renderNew);
-$("btn-logout").addEventListener("click", async () => { await api("/api/logout", { method: "POST" }); show("login-view"); });
+async function doLogout() { await api("/api/logout", { method: "POST" }); show("login-view"); }
+$("btn-logout").addEventListener("click", doLogout);
 document.querySelectorAll(".nav-item").forEach((b) =>
   b.addEventListener("click", () => {
     const n = b.dataset.nav;
@@ -1273,7 +1307,6 @@ document.querySelectorAll(".nav-item").forEach((b) =>
     else if (n === "people") renderPeople();
     else if (n === "fruit") renderFruit();
     else if (n === "ask") renderAsk();
-    else if (n === "dictate") renderDictate();
     else if (n === "you") renderYou();
     else { filterStatus = "ongoing"; renderList(); }
   }));
@@ -1334,12 +1367,8 @@ if (_params.has("login") || _params.has("backup") || _params.has("restore")) {
   history.replaceState(null, "", location.pathname);
 }
 
-function checkAdminAccess(me) {
-  const dictateNav = document.querySelector('.nav-item[data-nav="dictate"]');
-  if (dictateNav) {
-    dictateNav.classList.toggle("hidden", !me || !me.admin);
-  }
-}
+// Dictate is admin-only; it is reached from You, which checks the account itself.
+function checkAdminAccess(me) {}
 
 api("/api/me").then((me) => {
   checkAdminAccess(me);
