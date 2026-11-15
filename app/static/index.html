@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#efe7d6">
+<meta name="theme-color" content="#efe7d6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1c1814" media="(prefers-color-scheme: dark)">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -295,6 +296,46 @@ nav#nav,main{position:relative;z-index:1}
 }
 @media (max-width: 500px) {
   .settings-grid { grid-template-columns: 1fr; }
+}
+/* ---- Dark mode: follows the device setting. Candlelit rather than black, so
+   the parchment, sage and gold keep their character. ---- */
+@media (prefers-color-scheme:dark){
+  :root{color-scheme:dark;--bg:#191511;--bg2:#211c16;--card:#2a241d;--ink:#ece4d4;--muted:#b5aa94;
+    --accent:#9db398;--accent-dark:#b4c7af;--gold:#c9a253;--gold-ink:#d6b36c;--line:#40372c;--danger:#e0917f;
+    --fill:#566a53;--fill-hover:#667b62}
+  body{background:
+    radial-gradient(120% 80% at 15% 0%, rgba(74,60,40,.38) 0%, rgba(74,60,40,0) 45%),
+    radial-gradient(120% 90% at 85% 12%, rgba(66,54,36,.32) 0%, rgba(66,54,36,0) 40%),
+    radial-gradient(150% 120% at 50% 115%, rgba(0,0,0,.45) 0%, rgba(0,0,0,0) 55%),
+    linear-gradient(180deg, var(--bg2) 0%, var(--bg) 100%);
+    background-attachment:fixed}
+  .topbar{border-bottom-color:rgba(90,76,56,.5)}
+  .topbar::before{background:linear-gradient(180deg,rgba(33,28,22,.82),rgba(28,24,19,.7))}
+  header h1{text-shadow:0 0 14px rgba(0,0,0,.6)}
+  button{background:rgba(255,255,255,.06)}
+  button.primary,.chip.active{background:var(--fill);border-color:var(--fill);color:#fff}
+  button.primary:hover{background:var(--fill-hover);border-color:var(--fill-hover)}
+  button.link,.nav-item,.more-row{background:none}
+  input,textarea,select{background:rgba(255,255,255,.05)}
+  .card{box-shadow:0 6px 24px rgba(0,0,0,.28)}
+  .card.clickable:hover,.fruit-card:hover{box-shadow:0 10px 30px rgba(0,0,0,.42)}
+  .hero,.verse-card,.dictate-mic-container{background:linear-gradient(180deg,rgba(49,42,33,.96),rgba(40,34,27,.96));box-shadow:0 10px 34px rgba(0,0,0,.32)}
+  .chip{background:rgba(255,255,255,.05)}
+  .badge.answered{background:rgba(157,179,152,.18);color:var(--accent-dark)}
+  .badge.pending{background:rgba(201,162,83,.18);color:var(--gold-ink)}
+  .badge.error{background:rgba(224,145,127,.16);color:var(--danger)}
+  .google-btn,a.drive-btn{background:rgba(255,255,255,.06)}
+  .toast{background:#3d4a39}
+  .modal-overlay{background:rgba(0,0,0,.6)}
+  .modal{box-shadow:0 18px 50px rgba(0,0,0,.55)}
+  .nav-item{color:var(--muted)}
+  .fruit-card{box-shadow:0 6px 24px rgba(0,0,0,.28)}
+  .dictate-textarea{background:var(--card)}
+  .dictate-mic-btn{background:#352e25}
+  .dictate-mic-btn.transcribing{background:var(--fill);border-color:var(--fill)}
+}
+@media (prefers-color-scheme:dark) and (max-width:700px){
+  nav#nav{background:linear-gradient(180deg,rgba(33,28,22,.92),rgba(25,21,17,.96));border-top-color:rgba(90,76,56,.6)}
 }
 </style>
 </head>
