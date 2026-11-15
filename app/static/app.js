@@ -287,6 +287,34 @@ async function renderToday() {
 }
 
 // ---------- Fruit (answered prayers) ----------
+// The page is one vine (John 15). Each answered prayer is a branch off the stem:
+// bearing a cluster when it was given as asked, cut back with a new bud when it
+// was answered another way. The stem itself is drawn in CSS so rows can be any height.
+const LEAF = `<path class="v-leaf" d="M0 0c-3-6-1-12 5-14 1 3 4 4 7 3-1 4 1 6 4 7-2 5-9 7-16 4z"/><path class="v-vein" d="M0 0c4-3 8-6 11-10"/>`;
+const FRUIT_SVG = `<svg class="vine-branch" viewBox="0 0 92 104" aria-hidden="true">
+  <path class="v-wood" d="M16 30C32 26 44 18 60 20"/>
+  <path class="v-tendril" d="M40 22c2-8 10-9 11-3 1 4-5 5-5 1"/>
+  <g transform="translate(58 20) rotate(8)">${LEAF}</g>
+  <path class="v-wood thin" d="M60 20c1 5 0 8 0 12"/>
+  <g class="v-grapes">
+    <circle cx="53" cy="37" r="6"/><circle cx="64" cy="36" r="6"/><circle cx="74" cy="39" r="5.5"/>
+    <circle cx="58" cy="47" r="6"/><circle cx="69" cy="48" r="6"/>
+    <circle cx="63" cy="58" r="6"/><circle cx="64" cy="69" r="5"/>
+  </g>
+  <g class="v-shine"><circle cx="51" cy="35" r="1.6"/><circle cx="62" cy="34" r="1.6"/><circle cx="56" cy="45" r="1.6"/><circle cx="67" cy="46" r="1.6"/><circle cx="61" cy="56" r="1.6"/></g>
+</svg>`;
+const PRUNED_SVG = `<svg class="vine-branch" viewBox="0 0 92 104" aria-hidden="true">
+  <path class="v-wood" d="M16 30C26 28 34 25 42 22"/>
+  <ellipse class="v-cut" cx="43.5" cy="21.5" rx="2.2" ry="4.2" transform="rotate(24 43.5 21.5)"/>
+  <path class="v-wood thin" d="M33 25c1-5 3-8 6-11"/>
+  <g transform="translate(39 14) rotate(-28) scale(.62)">${LEAF}</g>
+</svg>`;
+const VINE_TIP_SVG = `<svg class="vine-tip" viewBox="0 0 92 40" aria-hidden="true">
+  <path class="v-wood" d="M16 40C16 28 18 20 24 14"/>
+  <path class="v-tendril" d="M24 14c4-8 14-8 14-1 0 5-7 5-6 0"/>
+  <g transform="translate(22 16) rotate(-70) scale(.7)">${LEAF}</g>
+</svg>`;
+
 async function renderFruit() {
   show("fruit-view");
   setNav("fruit");
@@ -294,20 +322,32 @@ async function renderFruit() {
   const items = await api("/api/prayers");
   const answered = items.filter((i) => i.status === "answered")
     .sort((a, b) => String(b.answered_date || b.date).localeCompare(String(a.answered_date || a.date)));
-  const cards = answered.map((i) => `
-    <div class="fruit-card" data-id="${esc(i.id)}">
-      <div class="answered-on">Answered${i.answered_date ? " · " + esc(i.answered_date) : ""}</div>
-      <h3>${esc(i.title)}</h3>
-      <div class="meta" style="margin-top:6px">${esc(i.preview)}${i.preview.length >= 160 ? "…" : ""}</div>
-    </div>`).join("");
+  const prayedFor = (d) => d === null || d === undefined ? ""
+    : d === 0 ? "Answered the same day" : `Prayed ${d} day${d === 1 ? "" : "s"}`;
+  const rows = answered.map((i) => {
+    const pruned = i.answer === "pruned";
+    return `
+    <div class="vine-row">
+      ${pruned ? PRUNED_SVG : FRUIT_SVG}
+      <button class="fruit-card ${pruned ? "pruned" : ""}" data-id="${esc(i.id)}">
+        <span class="answered-on">${pruned ? "Pruned" : "Fruit"}${i.answered_date ? " · " + esc(i.answered_date) : ""}</span>
+        <span class="fruit-title">${esc(i.title)}</span>
+        ${i.answer_text ? `<span class="fruit-answer">${esc(i.answer_text)}</span>`
+          : pruned ? `<span class="fruit-answer">Answered, though not as asked.</span>` : ""}
+        ${prayedFor(i.days_prayed) ? `<span class="meta">${prayedFor(i.days_prayed)}</span>` : ""}
+      </button>
+    </div>`; }).join("");
+  const nFruit = answered.filter((i) => i.answer !== "pruned").length, nPruned = answered.length - nFruit;
   $("fruit-view").innerHTML = `
     <div class="greeting">
       <span class="eyebrow">Fruit</span>
       <h2>How God has answered</h2>
     </div>
     ${answered.length
-      ? `<div class="fruit-grid">${cards}</div>`
-      : `<p class="meta" style="text-align:center">No answered prayers yet. Mark a prayer answered and it will bloom here.</p>`}`;
+      ? `<p class="vine-epigraph">“I am the vine; you are the branches.” <span>John 15:5</span></p>
+         <p class="meta" style="text-align:center;margin:0 0 18px">${nFruit} bearing fruit${nPruned ? ` · ${nPruned} pruned` : ""}</p>
+         <div class="vine">${VINE_TIP_SVG}${rows}<div class="vine-root" aria-hidden="true"></div></div>`
+      : `<p class="meta" style="text-align:center">No answered prayers yet. Mark a prayer answered and it will grow on your vine here.</p>`}`;
   $("fruit-view").querySelectorAll(".fruit-card").forEach((c) =>
     c.addEventListener("click", () => renderDetail(c.dataset.id)));
 }
@@ -901,10 +941,14 @@ function openModal() {
 
 // A small text prompt in the app's own style. Cancel (or tapping outside)
 // closes it without calling onSave.
-function textModal({ title, hint, placeholder, saveLabel, required, onSave }) {
+function textModal({ title, hint, placeholder, saveLabel, required, onSave, choices }) {
   const m = openModal();
+  let choice = choices ? choices[0].value : undefined;
   m.box.innerHTML = `
     <h3>${esc(title)}</h3>
+    ${choices ? `<div class="row" role="radiogroup" style="margin:10px 0 4px">${choices.map((c, i) =>
+      `<button type="button" class="chip ${i === 0 ? "active" : ""}" role="radio" aria-checked="${i === 0}" data-choice="${esc(c.value)}">${esc(c.label)}</button>`).join("")}</div>
+      <p class="meta" id="tm-choice-hint" style="margin:6px 0 0">${esc(choices[0].hint || "")}</p>` : ""}
     ${hint ? `<p class="meta">${esc(hint)}</p>` : ""}
     <textarea id="tm-text" placeholder="${esc(placeholder || "")}"></textarea>
     <div class="error-msg" id="tm-err"></div>
@@ -916,13 +960,20 @@ function textModal({ title, hint, placeholder, saveLabel, required, onSave }) {
   const save = m.box.querySelector("#tm-save");
   const err = m.box.querySelector("#tm-err");
   ta.focus();
+  m.box.querySelectorAll("[data-choice]").forEach((b) => b.addEventListener("click", () => {
+    choice = b.dataset.choice;
+    m.box.querySelectorAll("[data-choice]").forEach((o) => {
+      o.classList.toggle("active", o === b); o.setAttribute("aria-checked", String(o === b));
+    });
+    m.box.querySelector("#tm-choice-hint").textContent = choices.find((c) => c.value === choice).hint || "";
+  }));
   m.box.querySelector("#tm-cancel").addEventListener("click", m.close);
   save.addEventListener("click", async () => {
     const val = ta.value.trim();
     err.textContent = "";
     if (required && !val) { err.textContent = "Write a few words first."; return; }
     save.disabled = true;
-    try { await onSave(val); m.close(); }
+    try { await onSave(val, choice); m.close(); }
     catch (e) { err.textContent = e.message; save.disabled = false; }
   });
 }
@@ -1120,11 +1171,15 @@ async function renderDetail(id) {
   const btnA = $("btn-answered"), btnR = $("btn-reopen"), btnU = $("btn-update"), btnG = $("btn-regen");
   if (btnA) btnA.addEventListener("click", () => textModal({
     title: "Mark answered",
+    choices: [
+      { value: "given", label: "As I asked", hint: "Drawn on your vine as a branch bearing fruit." },
+      { value: "pruned", label: "Not as I asked", hint: "Drawn as a pruned branch — cut back to bear more (John 15:2)." },
+    ],
     hint: "How was this prayer answered? You can leave this blank.",
     placeholder: "e.g. The surgery went well and she is home resting",
     saveLabel: "Mark answered",
-    onSave: async (t) => {
-      await api(`/api/prayers/${encodeURIComponent(id)}/answered`, { method: "POST", body: JSON.stringify({ text: t }) });
+    onSave: async (t, outcome) => {
+      await api(`/api/prayers/${encodeURIComponent(id)}/answered`, { method: "POST", body: JSON.stringify({ text: t, outcome }) });
       renderDetail(id);
     },
   }));

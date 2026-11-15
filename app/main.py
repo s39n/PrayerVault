@@ -209,6 +209,12 @@ class TextBody(BaseModel):
     text: str = Field(default="", max_length=5000)
 
 
+class AnsweredBody(BaseModel):
+    text: str = Field(default="", max_length=5000)
+    # given = as asked (bears fruit); pruned = answered, but not as asked
+    outcome: str = Field(default="given", pattern="^(given|pruned)$")
+
+
 class OutreachBody(BaseModel):
     channel: str = Field(default="call", max_length=20)
     note: str = Field(default="", max_length=2000)
@@ -283,11 +289,11 @@ async def delete_prayer(note_id: str, user: str = Depends(auth.require_auth)):
 
 
 @app.post("/api/prayers/{note_id}/answered")
-async def mark_answered(note_id: str, body: TextBody,
+async def mark_answered(note_id: str, body: AnsweredBody,
                         user: str = Depends(auth.require_auth)):
     root = users.vault_for(user)
     _get_or_404(note_id, root)
-    notes.set_status(note_id, "answered", body.text, root=root)
+    notes.set_status(note_id, "answered", body.text, root=root, outcome=body.outcome)
     return {"ok": True}
 
 

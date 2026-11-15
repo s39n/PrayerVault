@@ -117,6 +117,35 @@ def write_note(note_id: str, fm: dict, sections: dict[str, str],
     _safe_path(note_id, root).write_text(render_note(fm, sections), encoding="utf-8")
 
 
+ANSWER_KINDS = ("given", "pruned")
+_ANSWER_LINE_RE = re.compile(
+    r"^- \d{4}-\d{2}-\d{2} — \*\*Answered[^*]*\*\*[ \t]*(.*)$", re.MULTILINE)
+
+
+def _fruit_fields(fm: dict, sections: dict[str, str]) -> dict:
+    """What the Fruit vine needs for an answered prayer.
+
+    ``answer`` is "given" (bearing fruit) unless the note says ``answer: pruned``
+    — answered, but not as asked (John 15:2). ``answer_text`` is the latest
+    "Answered" line from Updates; ``days_prayed`` runs from the note's date to the
+    day it was answered.
+    """
+    if fm.get("status") != "answered":
+        return {"answer": "", "answer_text": "", "days_prayed": None}
+    found = _ANSWER_LINE_RE.findall(sections.get("Updates", "") or "")
+    days = None
+    try:
+        days = (datetime.date.fromisoformat(str(fm.get("answered-date", "")))
+                - datetime.date.fromisoformat(str(fm.get("date", "")))).days
+    except ValueError:
+        pass
+    return {
+        "answer": "pruned" if fm.get("answer") == "pruned" else "given",
+        "answer_text": found[-1].strip() if found else "",
+        "days_prayed": days if days is not None and days >= 0 else None,
+    }
+
+
 def list_notes(root: Path | str | None = None) -> list[dict]:
     out = []
     for p in sorted(vault_dir(root).glob("*.md"), reverse=True):
@@ -136,6 +165,7 @@ def list_notes(root: Path | str | None = None) -> list[dict]:
             "requested_by": fm.get("requested-by", ""),
             "family": fm.get("family", ""),
             "answered_date": str(fm.get("answered-date", "")),
+            **_fruit_fields(fm, sections),
             "preview": (sections.get("Prayer", "")[:160]),
         })
     return out
@@ -328,15 +358,24 @@ def follow_up_list(root: Path | str | None = None,
 
 
 def set_status(note_id: str, status: str, note_text: str = "",
-               root: Path | str | None = None) -> None:
+               root: Path | str | None = None, outcome: str = "given") -> None:
     note = read_note(note_id, root)
     note["frontmatter"]["status"] = status
     today = datetime.date.today().isoformat()
     if status == "answered":
         note["frontmatter"]["answered-date"] = today
-        msg = "**Answered!**" + (f" {note_text.strip()}" if note_text.strip() else "")
+        # "given" is the default and is left unwritten, so existing notes are
+        # untouched; only a pruned answer adds the optional ``answer`` key.
+        if outcome == "pruned":
+            note["frontmatter"]["answer"] = "pruned"
+            head = "**Answered — not as asked.**"
+        else:
+            note["frontmatter"].pop("answer", None)
+            head = "**Answered!**"
+        msg = head + (f" {note_text.strip()}" if note_text.strip() else "")
     else:
         note["frontmatter"].pop("answered-date", None)
+        note["frontmatter"].pop("answer", None)
         msg = "Reopened" + (f" — {note_text.strip()}" if note_text.strip() else "")
     updates = note["sections"].get("Updates", "")
     note["sections"]["Updates"] = (updates + f"\n- {today} — {msg}").strip()

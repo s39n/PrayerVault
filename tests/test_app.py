@@ -405,3 +405,40 @@ def test_remove_moves_to_trash_not_erased(monkeypatch):
     assert not (notes.vault_dir() / f"{nid}.md").exists()
     assert (notes.vault_dir() / notes.TRASH_DIR / f"{nid}.md").exists()   # kept, not erased
     assert client.delete(f"/api/prayers/{nid}").status_code == 404
+
+
+def test_answered_given_or_pruned(monkeypatch):
+    async def fake_generate(kind, title, text, requested_by=""):
+        return ollama_client._shape(FAKE_AI)
+
+    monkeypatch.setattr(ollama_client, "generate", fake_generate)
+    client.post("/api/login", json={"username": "sean", "password": "testpass"})
+    mk = lambda t: client.post("/api/prayers", json={  # noqa: E731
+        "type": "prayer", "title": t, "text": "Lord, hear this."}).json()["id"]
+    given, pruned = mk("Vine given"), mk("Vine pruned")
+
+    # Default stays exactly as before: no extra frontmatter key
+    client.post(f"/api/prayers/{given}/answered", json={"text": "The job came through"})
+    n = client.get(f"/api/prayers/{given}").json()
+    assert "answer" not in n["frontmatter"]
+    assert "**Answered!** The job came through" in n["sections"]["Updates"]
+
+    r = client.post(f"/api/prayers/{pruned}/answered",
+                    json={"text": "A different door opened", "outcome": "pruned"})
+    assert r.status_code == 200
+    n = client.get(f"/api/prayers/{pruned}").json()
+    assert n["frontmatter"]["answer"] == "pruned"
+    assert "**Answered — not as asked.** A different door opened" in n["sections"]["Updates"]
+
+    items = {i["id"]: i for i in client.get("/api/prayers").json()}
+    assert items[given]["answer"] == "given"
+    assert items[given]["answer_text"] == "The job came through"
+    assert items[given]["days_prayed"] == 0
+    assert items[pruned]["answer"] == "pruned"
+    assert items[pruned]["answer_text"] == "A different door opened"
+
+    assert client.post(f"/api/prayers/{given}/answered", json={"outcome": "bad"}).status_code == 422
+
+    # Reopening clears the outcome
+    client.post(f"/api/prayers/{pruned}/reopen", json={"text": ""})
+    assert "answer" not in client.get(f"/api/prayers/{pruned}").json()["frontmatter"]

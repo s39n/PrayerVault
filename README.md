@@ -155,7 +155,8 @@ The app fails fast at startup if secrets are missing. Never commit `.env`.
 title: Healing for a friend
 date: '2026-07-02'
 type: request            # prayer | request
-status: ongoing          # ongoing | answered (+ answered-date when answered)
+status: ongoing          # ongoing | answered (+ answered-date when answered;
+                         #   optional `answer: pruned` = answered, not as asked)
 ai: done                 # pending | done | error
 tags: [prayer, prayer/request]
 requested-by: The Smiths # only on requests

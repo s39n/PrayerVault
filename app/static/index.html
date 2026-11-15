@@ -15,7 +15,7 @@
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <style>
-:root{--bg:#efe7d6;--bg2:#f5efe1;--card:#fffdf7;--ink:#2f2a22;--muted:#675f52;--accent:#5b6e58;--accent-dark:#46543f;--gold:#a9843c;--gold-ink:#7d5f22;--line:#e6ddca;--danger:#9c4a3c}
+:root{--vine:#7b6a48;--grape:#7a2f3d;--grape-hi:#b46a78;--bg:#efe7d6;--bg2:#f5efe1;--card:#fffdf7;--ink:#2f2a22;--muted:#675f52;--accent:#5b6e58;--accent-dark:#46543f;--gold:#a9843c;--gold-ink:#7d5f22;--line:#e6ddca;--danger:#9c4a3c}
 *{box-sizing:border-box}
 body{
   margin:0;color:var(--ink);line-height:1.6;
@@ -102,7 +102,34 @@ nav#nav.hidden{display:none}
 .verse-card .verse-ref{color:var(--gold-ink);letter-spacing:1px;font-size:.9rem}
 .next-step{text-align:center;color:var(--muted);font-style:italic;margin:18px 0}
 .fruit-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}
-.fruit-card{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:14px;padding:18px;box-shadow:0 6px 24px rgba(120,100,60,.06);transition:box-shadow .2s,transform .15s;cursor:pointer}
+.fruit-card{display:flex;flex-direction:column;gap:4px;width:100%;text-align:left;font-size:1rem;background:var(--card);border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:14px;padding:16px 18px;box-shadow:0 6px 24px rgba(120,100,60,.06);transition:box-shadow .2s,transform .15s;cursor:pointer}
+.fruit-card.pruned{border-left-color:var(--vine)}
+.fruit-title{font-size:1.12rem}
+.fruit-answer{font-style:italic;color:var(--ink)}
+/* The vine: a stem down the left, one branch per answered prayer. */
+.vine-epigraph{text-align:center;font-style:italic;font-size:1.1rem;margin:0 0 4px}
+.vine-epigraph span{display:block;font-style:normal;font-size:.8rem;letter-spacing:1px;color:var(--gold-ink);margin-top:2px}
+.vine{position:relative;padding-bottom:6px}
+.vine-row{position:relative;display:grid;grid-template-columns:92px 1fr;align-items:start;padding-bottom:18px}
+.vine-row::before,.vine-root{content:"";position:absolute;left:13px;top:0;bottom:0;width:6px;border-radius:3px;
+  background:linear-gradient(90deg,rgba(0,0,0,.18),rgba(255,255,255,.12) 45%,rgba(0,0,0,.1)),var(--vine)}
+.vine-row::before{border-radius:0}
+.vine-root{top:auto;bottom:-10px;height:22px;border-radius:0 0 8px 8px}
+.vine-branch{width:92px;height:104px;display:block;position:relative}
+.vine-tip{width:92px;height:40px;display:block}
+.v-wood{fill:none;stroke:var(--vine);stroke-width:5;stroke-linecap:round}
+.v-wood.thin{stroke-width:2.2}
+.v-tendril{fill:none;stroke:var(--accent);stroke-width:1.4;stroke-linecap:round}
+.v-leaf{fill:var(--accent);opacity:.92}
+.v-vein{fill:none;stroke:var(--card);stroke-width:.9;opacity:.7}
+.v-grapes circle{fill:var(--grape);stroke:rgba(40,10,18,.35);stroke-width:.8}
+.v-shine circle{fill:var(--grape-hi);opacity:.75}
+.v-cut{fill:#d9c9a3;stroke:var(--vine);stroke-width:1}
+@media (max-width:560px){
+  .vine-row{grid-template-columns:70px 1fr}
+  .vine-branch{width:70px;height:80px}.vine-tip{width:70px;height:31px}
+  .vine-row::before,.vine-root{left:10px;width:5px}
+}
 .fruit-card:hover{box-shadow:0 10px 30px rgba(120,100,60,.13);transform:translateY(-1px)}
 .fruit-card h3{font-size:1.1rem;font-weight:normal;margin:0 0 4px}
 .fruit-card .answered-on{color:var(--gold-ink);font-size:.78rem;text-transform:uppercase;letter-spacing:1.5px}
@@ -307,7 +334,7 @@ button.danger-btn{border-color:var(--danger);color:var(--danger)}
 @media (prefers-color-scheme:dark){
   :root{color-scheme:dark;--bg:#191511;--bg2:#211c16;--card:#2a241d;--ink:#ece4d4;--muted:#b5aa94;
     --accent:#9db398;--accent-dark:#b4c7af;--gold:#c9a253;--gold-ink:#d6b36c;--line:#40372c;--danger:#e0917f;
-    --fill:#566a53;--fill-hover:#667b62}
+    --fill:#566a53;--fill-hover:#667b62;--vine:#8d7a54;--grape:#9a4455;--grape-hi:#cf8b98}
   body{background:
     radial-gradient(120% 80% at 15% 0%, rgba(74,60,40,.38) 0%, rgba(74,60,40,0) 45%),
     radial-gradient(120% 90% at 85% 12%, rgba(66,54,36,.32) 0%, rgba(66,54,36,0) 40%),
@@ -424,7 +451,7 @@ button.danger-btn{border-color:var(--danger);color:var(--danger)}
   <div id="detail-view" class="hidden"></div>
   <div id="new-view" class="hidden"></div>
 </main>
-<script src="/app.js?v=9"></script>
+<script src="/app.js?v=10"></script>
 <script src="/veil.js?v=4"></script>
 </body>
 </html>
