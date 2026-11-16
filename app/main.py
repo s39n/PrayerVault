@@ -193,7 +193,7 @@ async def restore_drive(user: str = Depends(auth.require_auth)):
 
 class NewPrayer(BaseModel):
     type: str = Field(pattern="^(prayer|request)$")
-    title: str = Field(min_length=1, max_length=120)
+    title: str = Field(default="", max_length=120)   # blank = titled from the first words
     text: str = Field(min_length=1, max_length=20000)
     requested_by: str = Field(default="", max_length=120)
     family: str = Field(default="", max_length=60)
@@ -248,9 +248,10 @@ async def create_prayer(body: NewPrayer, bg: BackgroundTasks,
     family = body.family.strip()
     if family and not families.get_family(family, root):
         raise HTTPException(422, "Unknown family")
-    note_id = notes.create_note(body.type, body.title, body.text, body.requested_by,
+    title = body.title.strip() or notes.title_from_text(body.text)
+    note_id = notes.create_note(body.type, title, body.text, body.requested_by,
                                 family=family, root=root)
-    bg.add_task(_run_ai, note_id, body.type, body.title, body.text, body.requested_by,
+    bg.add_task(_run_ai, note_id, body.type, title, body.text, body.requested_by,
                 root)
     return {"id": note_id}
 

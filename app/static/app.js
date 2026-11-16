@@ -27,6 +27,35 @@ function show(view) {
 // On phones the bar holds five places; Ask and Dictate live under You there,
 // so You stays lit while either is open.
 const PHONE = window.matchMedia("(max-width:700px)");
+// ---------- Routes ----------
+// Every view has an address (#/today, #/prayer/<id> …) so the browser's and the
+// phone's Back work, a refresh stays where you were, and a prayer can be bookmarked.
+function setRoute(path) {
+  const want = "#" + path;
+  if (location.hash === want) return;
+  // First address of the visit replaces the bare URL, so Back never lands on a blank one.
+  if (!location.hash) history.replaceState(null, "", want);
+  else history.pushState(null, "", want);
+}
+function route() {
+  const [, name, ...rest] = location.hash.split("/");
+  let arg = "";
+  try { arg = rest.length ? decodeURIComponent(rest.join("/")) : ""; } catch (e) { /* bad escape */ }
+  if (name === "prayer" && arg) renderDetail(arg);
+  else if (name === "prayers") renderList();
+  else if (name === "search" && arg) renderSearch(arg);
+  else if (name === "people") arg ? renderFamily(arg) : renderPeople();
+  else if (name === "fruit") renderFruit();
+  else if (name === "ask") renderAsk();
+  else if (name === "dictate") renderDictate();
+  else if (name === "you") renderYou();
+  else if (name === "new") renderNew();
+  else renderToday();
+}
+window.addEventListener("popstate", () => {
+  if (!document.body.classList.contains("logged-out")) route();
+});
+
 function setNav(name) {
   const underYou = name === "dictate" || (name === "ask" && PHONE.matches);
   document.querySelectorAll(".nav-item").forEach((b) =>
@@ -87,6 +116,7 @@ const aiBadge = (ai) =>
 // ---------- List ----------
 async function renderList() {
   show("list-view");
+  setRoute("/prayers");
   setNav("prayers");
   backTarget = renderList;
   const items = await api("/api/prayers");
@@ -132,6 +162,7 @@ async function renderList() {
 
 async function renderSearch(q) {
   show("list-view");
+  setRoute("/search/" + encodeURIComponent(q));
   backTarget = () => renderSearch(q);
   let results;
   try { results = await api("/api/search?q=" + encodeURIComponent(q)); }
@@ -228,6 +259,7 @@ function greeting() {
 
 async function renderToday() {
   show("today-view");
+  setRoute("/today");
   setNav("today");
   backTarget = renderToday;
   const items = await api("/api/prayers");
@@ -317,6 +349,7 @@ const VINE_TIP_SVG = `<svg class="vine-tip" viewBox="0 0 92 40" aria-hidden="tru
 
 async function renderFruit() {
   show("fruit-view");
+  setRoute("/fruit");
   setNav("fruit");
   backTarget = renderFruit;
   const items = await api("/api/prayers");
@@ -355,6 +388,7 @@ async function renderFruit() {
 // ---------- Ask (Scripture Q&A) ----------
 function renderAsk() {
   show("ask-view");
+  setRoute("/ask");
   setNav("ask");
   $("ask-view").innerHTML = `
     <button class="link phone-only" id="ask-back">&larr; You</button>
@@ -413,6 +447,7 @@ async function renderDictate() {
   }
 
   show("dictate-view");
+  setRoute("/dictate");
   setNav("dictate");
   
   $("dictate-view").innerHTML = `
@@ -790,6 +825,7 @@ function wireMore() {
 
 async function renderYou() {
   show("you-view");
+  setRoute("/you");
   setNav("you");
   $("you-view").innerHTML = `
     <div class="greeting"><span class="eyebrow">You</span><h2>Settings</h2></div>
@@ -941,7 +977,7 @@ function openModal() {
 
 // A small text prompt in the app's own style. Cancel (or tapping outside)
 // closes it without calling onSave.
-function textModal({ title, hint, placeholder, saveLabel, required, onSave, choices }) {
+function textModal({ title, hint, placeholder, saveLabel, required, onSave, choices, singleLine }) {
   const m = openModal();
   let choice = choices ? choices[0].value : undefined;
   m.box.innerHTML = `
@@ -950,7 +986,8 @@ function textModal({ title, hint, placeholder, saveLabel, required, onSave, choi
       `<button type="button" class="chip ${i === 0 ? "active" : ""}" role="radio" aria-checked="${i === 0}" data-choice="${esc(c.value)}">${esc(c.label)}</button>`).join("")}</div>
       <p class="meta" id="tm-choice-hint" style="margin:6px 0 0">${esc(choices[0].hint || "")}</p>` : ""}
     ${hint ? `<p class="meta">${esc(hint)}</p>` : ""}
-    <textarea id="tm-text" placeholder="${esc(placeholder || "")}"></textarea>
+    ${singleLine ? `<input id="tm-text" placeholder="${esc(placeholder || "")}">`
+      : `<textarea id="tm-text" placeholder="${esc(placeholder || "")}"></textarea>`}
     <div class="error-msg" id="tm-err"></div>
     <div class="row" style="margin-top:12px">
       <button class="primary" id="tm-save">${esc(saveLabel)}</button>
@@ -960,6 +997,7 @@ function textModal({ title, hint, placeholder, saveLabel, required, onSave, choi
   const save = m.box.querySelector("#tm-save");
   const err = m.box.querySelector("#tm-err");
   ta.focus();
+  if (singleLine) ta.addEventListener("keydown", (e) => { if (e.key === "Enter") save.click(); });
   m.box.querySelectorAll("[data-choice]").forEach((b) => b.addEventListener("click", () => {
     choice = b.dataset.choice;
     m.box.querySelectorAll("[data-choice]").forEach((o) => {
@@ -1117,7 +1155,16 @@ function relatedHtml(s) {
 
 async function renderDetail(id) {
   show("detail-view");
-  const n = await api("/api/prayers/" + encodeURIComponent(id));
+  setRoute("/prayer/" + encodeURIComponent(id));
+  let n;
+  try { n = await api("/api/prayers/" + encodeURIComponent(id)); }
+  catch (e) {
+    if (e.message === "auth") return;
+    $("detail-view").innerHTML = `<button class="link" id="btn-back">&larr; Back</button>
+      <p class="meta" style="text-align:center;margin-top:24px">This prayer is no longer in your journal.</p>`;
+    $("btn-back").addEventListener("click", () => { backTarget = null; renderList(); });
+    return;
+  }
   const fm = n.frontmatter, s = n.sections;
   const sec = (name) => s[name] ? `<div class="section-title">${name}</div>${md(s[name])}` : "";
   const pending = fm.ai === "pending";
@@ -1225,42 +1272,49 @@ async function renderDetail(id) {
 function renderNew(initialText = "") {
   if (typeof initialText !== "string") initialText = "";
   show("new-view");
+  setRoute("/new");
+  setNav("");
   $("new-view").innerHTML = `
     <button class="link" id="btn-back2">&larr; Back</button>
     <div class="card">
       <h2 style="margin-top:0;font-weight:normal">New prayer</h2>
-      <label>Type</label>
-      <select id="np-type">
-        <option value="prayer">My prayer</option>
-        <option value="request">Prayer request (for someone else)</option>
-      </select>
-      <div id="np-who-wrap" class="hidden"><label>Requested by / for</label><input id="np-who" placeholder="e.g. The Johnson family"></div>
-      <label>File under (person or family)</label>
-      <div class="row">
-        <select id="np-family" style="flex:1"><option value="">— none —</option></select>
-        <button id="np-family-new" type="button">+ New</button>
-      </div>
-      <label>Title</label><input id="np-title" placeholder="A few words, e.g. Wisdom for a hard decision">
       <div class="row" style="justify-content:space-between;align-items:flex-end">
-        <label style="margin-bottom:4px">Prayer</label>
+        <label style="margin-bottom:4px">Your prayer</label>
         <button id="np-mic" title="Speak your prayer">&#127908; Record</button>
       </div>
       <textarea id="np-text" placeholder="Pour it out here… or press Record and speak">${esc(initialText)}</textarea>
+      <label>Title <span class="optional">optional</span></label>
+      <input id="np-title" placeholder="Leave blank to use your first words">
+      <label>This is</label>
+      <div class="row" role="radiogroup">
+        <button type="button" class="chip active" role="radio" aria-checked="true" data-type="prayer">My own prayer</button>
+        <button type="button" class="chip" role="radio" aria-checked="false" data-type="request">A request for someone else</button>
+      </div>
+      <label>Who is it for? <span class="optional">optional</span></label>
+      <div class="row">
+        <select id="np-family" style="flex:1"><option value="">— none —</option></select>
+        <button id="np-family-new" type="button">+ New person</button>
+      </div>
       <div class="error-msg" id="np-error"></div>
       <button class="primary" id="np-save" style="margin-top:6px">Save &amp; seek Scripture</button>
     </div>`;
   $("btn-back2").addEventListener("click", goBack);
-  $("np-type").addEventListener("change", (e) =>
-    $("np-who-wrap").classList.toggle("hidden", e.target.value !== "request"));
+  let npType = "prayer";
+  $("new-view").querySelectorAll("[data-type]").forEach((b) => b.addEventListener("click", () => {
+    npType = b.dataset.type;
+    $("new-view").querySelectorAll("[data-type]").forEach((o) => {
+      o.classList.toggle("active", o === b); o.setAttribute("aria-checked", String(o === b));
+    });
+  }));
   loadFamilyOptions("np-family");
-  $("np-family-new").addEventListener("click", async () => {
-    const name = prompt("New person or family name:");
-    if (!name || !name.trim()) return;
-    try {
-      const f = await api("/api/families", { method: "POST", body: JSON.stringify({ name: name.trim() }) });
+  $("np-family-new").addEventListener("click", () => textModal({
+    title: "New person or family", placeholder: "e.g. The Johnson family",
+    saveLabel: "Add", required: true, singleLine: true,
+    onSave: async (name) => {
+      const f = await api("/api/families", { method: "POST", body: JSON.stringify({ name }) });
       await loadFamilyOptions("np-family", f.id);
-    } catch (e) { $("np-error").textContent = e.message; }
-  });
+    },
+  }));
   let rec = null, chunks = [];
   const micBtn = $("np-mic");
   micBtn.addEventListener("click", async () => {
@@ -1297,11 +1351,15 @@ function renderNew(initialText = "") {
     } catch (e) { $("np-error").textContent = "Microphone access denied: " + e.message; }
   });
   $("np-save").addEventListener("click", async () => {
+    const text = $("np-text").value.trim();
+    if (!text) { $("np-error").textContent = "Write or record your prayer first."; return; }
+    const fam = $("np-family");
+    // One "who" field: the person files the prayer, and names it on a request.
+    const who = npType === "request" && fam.value ? fam.options[fam.selectedIndex].text : "";
     try {
       const res = await api("/api/prayers", { method: "POST", body: JSON.stringify({
-        type: $("np-type").value, title: $("np-title").value.trim(),
-        text: $("np-text").value.trim(), requested_by: $("np-who").value.trim(),
-        family: $("np-family").value,
+        type: npType, title: $("np-title").value.trim(), text, requested_by: who,
+        family: fam.value,
       })});
       renderDetail(res.id);
     } catch (e) { $("np-error").textContent = e.message; }
@@ -1322,6 +1380,7 @@ async function loadFamilyOptions(selectId, selected) {
 
 async function renderPeople() {
   show("people-view");
+  setRoute("/people");
   setNav("people");
   backTarget = renderPeople;
   $("people-view").innerHTML = `
@@ -1369,6 +1428,7 @@ async function loadFamilies() {
 
 async function renderFamily(id) {
   show("people-view");
+  setRoute("/people/" + encodeURIComponent(id));
   setNav("people");
   backTarget = () => renderFamily(id);
   $("people-view").innerHTML = `<p class="meta" style="text-align:center">Loading…</p>`;
@@ -1416,7 +1476,7 @@ async function doLogin() {
     })});
     const me = await api("/api/me");
     checkAdminAccess(me);
-    renderToday();
+    route();
   } catch (e) { if (e.message !== "auth") $("login-error").textContent = e.message; else $("login-error").textContent = "Invalid username or password"; }
 }
 
@@ -1497,7 +1557,7 @@ function checkAdminAccess(me) {}
 
 api("/api/me").then((me) => {
   checkAdminAccess(me);
-  renderToday();
+  route();
 }).catch(() => {
   checkAdminAccess(null);
   show("login-view");

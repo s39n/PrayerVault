@@ -73,6 +73,17 @@ def render_note(fm: dict, sections: dict[str, str]) -> str:
     return "\n".join(parts)
 
 
+def title_from_text(text: str) -> str:
+    """A short title from the opening words of a prayer, for when none was given."""
+    first = re.split(r"(?<=[.!?])\s|\n", (text or "").strip(), maxsplit=1)[0]
+    words = first.split()
+    title = " ".join(words[:8])
+    if len(words) > 8 or len(title) > 60:
+        title = title[:60].rsplit(" ", 1)[0] if len(title) > 60 else title
+        title = title.rstrip(" ,;:—-") + "…"
+    return title.strip(" .!?") if not title.endswith("…") else title
+
+
 def create_note(kind: str, title: str, text: str, requested_by: str = "",
                 family: str = "", root: Path | str | None = None) -> str:
     today = datetime.date.today().isoformat()

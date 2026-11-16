@@ -442,3 +442,19 @@ def test_answered_given_or_pruned(monkeypatch):
     # Reopening clears the outcome
     client.post(f"/api/prayers/{pruned}/reopen", json={"text": ""})
     assert "answer" not in client.get(f"/api/prayers/{pruned}").json()["frontmatter"]
+
+
+def test_blank_title_uses_first_words(monkeypatch):
+    async def fake_generate(kind, title, text, requested_by=""):
+        return ollama_client._shape(FAKE_AI)
+
+    monkeypatch.setattr(ollama_client, "generate", fake_generate)
+    client.post("/api/login", json={"username": "sean", "password": "testpass"})
+    r = client.post("/api/prayers", json={
+        "type": "prayer", "text": "Lord, give me patience today. The kids are loud."})
+    assert r.status_code == 200
+    n = client.get(f"/api/prayers/{r.json()['id']}").json()
+    assert n["frontmatter"]["title"] == "Lord give me patience today"
+
+    assert notes.title_from_text("one two three four five six seven eight nine ten").endswith("…")
+    assert client.post("/api/prayers", json={"type": "prayer", "text": ""}).status_code == 422
