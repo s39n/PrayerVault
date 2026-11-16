@@ -10,19 +10,14 @@ from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse,
                                RedirectResponse)
 from pydantic import BaseModel, Field
 
-from . import (auth, config, db, embeddings, families, google_auth, notes, notify,
-               notifications, ollama_client, settings, stt, users)
-from .church_api import router as church_router
+from . import (auth, config, embeddings, families, google_auth, notes, notify,
+               ollama_client, settings, stt, users)
 
 log = logging.getLogger("prayervault")
 logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(title="PrayerVault", docs_url=None, redoc_url=None, openapi_url=None)
 STATIC = Path(__file__).parent / "static"
-
-# Multi-church prayer-sharing API (accounts, churches, elder flow). Distinct route
-# prefixes from the legacy single-user vault routes below.
-app.include_router(church_router)
 
 
 @app.middleware("http")
@@ -533,39 +528,9 @@ async def _morning_loop():
         await asyncio.sleep(30)
 
 
-async def _dispatch_loop():
-    """Safety net: flush any queued notifications the request-time background tasks
-    didn't deliver (e.g. queued while SMTP was down). Sends resume once SMTP works."""
-    while True:
-        try:
-            notifications.dispatch_pending()
-        except Exception:
-            log.exception("Notification dispatch error")
-        await asyncio.sleep(60)
-
-
-async def _digest_loop():
-    """Send weekly digests once per day at 07:00 to whoever is due that weekday."""
-    last_run = None
-    while True:
-        try:
-            now = datetime.datetime.now()
-            if now.hour == 7 and last_run != now.date():
-                notifications.send_weekly_digests(now.weekday())
-                last_run = now.date()
-        except Exception:
-            log.exception("Digest scheduler error")
-        await asyncio.sleep(60)
-
-
 @app.on_event("startup")
 async def _start_scheduler():
-    # Bring the schema up to date via Alembic (falls back to create_all if Alembic
-    # isn't available). Keeps a fresh NAS deploy and local dev zero-config.
-    db.migrate()
     asyncio.create_task(_morning_loop())
-    asyncio.create_task(_dispatch_loop())
-    asyncio.create_task(_digest_loop())
 
 
 # ---------- Frontend ----------

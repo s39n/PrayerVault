@@ -35,6 +35,10 @@ requested-by: The Smiths # only on requests
 ## Updates         timeline: "- YYYY-MM-DD — text"; answered entries land here
 ```
 
+- Optional frontmatter `answer: pruned` marks a prayer answered "not as asked"
+  (drawn as a pruned branch on the Fruit vine); absent means given as asked
+- Editing never renames the file; removing moves it to `.trash/` beside the notes
+
 - Section order is enforced by `notes.SECTION_ORDER`
 - Verse links MUST use Sean's vault format: `[[John 1#13|John 1:13]]`, ranges link the
   first verse only: `[[John 1#13|John 1:13-16]]` (built by `ollama_client._wikilink`)
@@ -53,7 +57,8 @@ pytest tests/
 $env:SESSION_SECRET="dev"; $env:AUTH_PASSWORD_HASH="<hash>"; $env:VAULT_DIR="C:\tmp\vault"; $env:COOKIE_SECURE="false"
 uvicorn app.main:app --reload
 
-# Deploy
+# Deploy (the live site is the NAS): push to master, wait for the GitHub Actions
+# image build, then redeploy the Dockhand git stack "prayervault-nas"
 docker compose up -d --build
 ```
 
@@ -70,7 +75,11 @@ if secrets are missing. Never commit `.env`.
 - Production vault path: `C:\Users\Sean\Documents\SecondBrain\Atlas\Faith & Ministry\Prayers\Prayer Journal`
   — the vault is its own git repo (s39n/SecondBrain) and syncs to Sean's devices; treat
   note files as user data, never bulk-rewrite them
-- Single user by design; auth is bcrypt + SameSite=Strict HttpOnly cookie. Don't weaken
+- The multi-church app (elders, shared requests, database) was split out in
+  November 2026 into `s39n/PrayerVault-Church` (`C:\Users\Sean\Projects\PrayerVault-Church`).
+  Nothing church-related belongs in this repo; there is no database here
+- One admin (bcrypt) plus optional Google sign-in users, each with a private journal
+  folder; auth is a SameSite=Strict HttpOnly cookie. Don't weaken
   headers/CSP in `main.py` (`script-src 'self'` means no inline JS in index.html — JS
   lives in `app.js`)
 - Frontend must stay dependency-free (no CDN, no build step)

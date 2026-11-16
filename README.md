@@ -190,6 +190,13 @@ uvicorn app.main:app --reload
 Pushes to `master` build and publish `ghcr.io/s39n/prayervault:latest` via
 GitHub Actions (tests must pass first).
 
+## For congregations
+
+The shared, multi-church side — requests to the elders, shepherding, updates and
+notifications — lives in its own project,
+[PrayerVault Church](https://github.com/s39n/PrayerVault-Church), with its own
+container and database. This app stays a personal journal with no database.
+
 ## Support
 
 If PrayerVault blesses you, you can
